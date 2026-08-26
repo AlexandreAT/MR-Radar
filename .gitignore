@@ -1,0 +1,22 @@
+# Dependências
+node_modules/
+
+# Variáveis de ambiente (NUNCA commitar: contém o token pessoal do GitLab)
+.env
+.env.*
+!.env.example
+
+# Saídas de build
+dist/
+build/
+*.tsbuildinfo
+
+# Logs
+*.log
+npm-debug.log*
+
+# Arquivos de editor e do sistema
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,16 @@
+{
+    "name": "mr-radar",
+    "version": "0.1.0",
+    "private": true,
+    "description": "Dashboard local e somente leitura para acompanhar os comentários abertos de revisão de Merge Requests do GitLab",
+    "engines": {
+        "node": ">=16.14.0"
+    },
+    "scripts": {
+        "setup": "npm install --prefix backend && npm install --prefix frontend",
+        "dev": "node scripts/dev.mjs",
+        "dev:backend": "npm run dev --prefix backend",
+        "dev:frontend": "npm run dev --prefix frontend",
+        "typecheck": "npm run typecheck --prefix backend && npm run typecheck --prefix frontend"
+    }
+}

@@ -1,0 +1,157 @@
+/** Filtro de status aplicado às threads de comentários. */
+export enum StatusFiltro {
+    Abertos = "abertos",
+    Resolvidos = "resolvidos",
+    Todos = "todos",
+}
+
+/** Lado do diff em que o comentário foi ancorado. */
+export enum LadoDiff {
+    Novo = "novo",
+    Antigo = "antigo",
+}
+
+/** Códigos de erro que o backend pode devolver. */
+export enum CodigoErroBackend {
+    ConfiguracaoInvalida = "CONFIGURACAO_INVALIDA",
+    ParametroInvalido = "PARAMETRO_INVALIDO",
+    TokenInvalido = "TOKEN_INVALIDO",
+    AcessoNegado = "ACESSO_NEGADO",
+    NaoEncontrado = "NAO_ENCONTRADO",
+    LimiteRequisicoes = "LIMITE_REQUISICOES",
+}
+
+/** Autor de um comentário ou de um Merge Request. */
+export interface Autor {
+    nome: string;
+    usuario: string;
+    urlAvatar: string | null;
+}
+
+/** Linha exibida dentro do trecho de código. */
+export interface LinhaTrecho {
+    numero: number;
+    texto: string;
+    destacada: boolean;
+}
+
+/** Trecho de código em volta da linha comentada. */
+export interface TrechoCodigo {
+    linguagem: string;
+    ref: string;
+    primeiraLinha: number;
+    ultimaLinha: number;
+    linhaInicialDestaque: number;
+    linhaFinalDestaque: number;
+    linhas: LinhaTrecho[];
+}
+
+/** Motivo pelo qual não foi possível exibir o trecho de código. */
+export interface ErroTrecho {
+    codigo: string;
+    mensagem: string;
+}
+
+/** Resposta enviada dentro de uma thread já existente. */
+export interface RespostaComentario {
+    id: number;
+    autor: Autor;
+    corpo: string;
+    criadoEm: string;
+}
+
+/** Thread de revisão exibida no dashboard. */
+export interface ComentarioRevisao {
+    id: string;
+    comentario: string;
+    caminhoArquivo: string | null;
+    linha: number | null;
+    lado: LadoDiff | null;
+    codigo: string | null;
+    trecho: TrechoCodigo | null;
+    erroTrecho: ErroTrecho | null;
+    autor: Autor;
+    criadoEm: string;
+    atualizadoEm: string;
+    resolvido: boolean;
+    resolvivel: boolean;
+    url: string;
+    respostas: RespostaComentario[];
+}
+
+/** Dados do Merge Request exibidos no cabeçalho do dashboard. */
+export interface MergeRequestResumo {
+    iid: number;
+    titulo: string;
+    url: string;
+    situacao: string;
+    autor: Autor;
+    branchOrigem: string;
+    branchDestino: string;
+}
+
+/**
+ * Contagem das threads encontradas no Merge Request.
+ * abertos + resolvidos + naoResolviveis é sempre igual a total.
+ */
+export interface ContagemComentarios {
+    total: number;
+    abertos: number;
+    resolvidos: number;
+    naoResolviveis: number;
+}
+
+/** Resposta completa da consulta de comentários de um Merge Request. */
+export interface RevisaoMergeRequest {
+    mergeRequest: MergeRequestResumo;
+    contagem: ContagemComentarios;
+    comentarios: ComentarioRevisao[];
+    consultadoEm: string;
+    paginacaoTruncada: boolean;
+}
+
+/** Configuração que o backend expõe para a tela. */
+export interface ConfiguracaoDashboard {
+    urlGitLab: string;
+    tokenConfigurado: boolean;
+    linhasContexto: number;
+    somenteLeitura: boolean;
+    problemas: string[];
+}
+
+/** De quem são os Merge Requests listados na tela. */
+export enum EscopoMergeRequest {
+    CriadosPorMim = "criados_por_mim",
+    AtribuidosAMim = "atribuidos_a_mim",
+}
+
+/** Merge Request aberto exibido no seletor da tela. */
+export interface MergeRequestAberto {
+    projetoId: string;
+    caminhoProjeto: string;
+    iid: number;
+    titulo: string;
+    url: string;
+    rascunho: boolean;
+    branchOrigem: string;
+    branchDestino: string;
+    atualizadoEm: string;
+    autor: Autor;
+    temThreadsAbertas: boolean | null;
+    totalComentarios: number;
+}
+
+/** Resposta da listagem dos Merge Requests abertos do usuário. */
+export interface ListaMergeRequestsAbertos {
+    escopo: EscopoMergeRequest;
+    mergeRequests: MergeRequestAberto[];
+    consultadoEm: string;
+    paginacaoTruncada: boolean;
+}
+
+/** Parâmetros informados na tela para consultar um Merge Request. */
+export interface ParametrosBuscaRevisao {
+    projetoId: string;
+    mrIid: string;
+    status: StatusFiltro;
+}

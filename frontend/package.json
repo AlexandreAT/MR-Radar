@@ -1,0 +1,29 @@
+{
+    "name": "mr-radar-frontend",
+    "version": "0.1.0",
+    "private": true,
+    "type": "module",
+    "description": "Dashboard local que lista os comentários abertos de revisão de um Merge Request",
+    "engines": {
+        "node": ">=16.14.0"
+    },
+    "scripts": {
+        "dev": "vite",
+        "build": "npm run typecheck && vite build",
+        "preview": "vite preview",
+        "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json"
+    },
+    "dependencies": {
+        "react": "18.2.0",
+        "react-dom": "18.2.0",
+        "styled-components": "6.1.8"
+    },
+    "devDependencies": {
+        "@types/node": "22.15.21",
+        "@types/react": "18.2.79",
+        "@types/react-dom": "18.2.25",
+        "@vitejs/plugin-react": "4.2.1",
+        "typescript": "5.4.5",
+        "vite": "4.5.3"
+    }
+}
