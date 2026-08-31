@@ -1,6 +1,7 @@
 import { AutorGitLab, DiscussaoGitLab, ExtremidadeIntervaloGitLab, MergeRequestGitLab, NotaGitLab, PosicaoGitLab, TipoPosicaoGitLab } from "../integracao/gitlab/types";
 import { Autor, ComentarioRevisao, ContagemComentarios, LadoDiff, MergeRequestResumo, RespostaComentario, StatusFiltro } from "../models/Revisao/types";
 import { EhAutorSistema } from "../utilidades/AutorSistema";
+import { GetRotuloRevisao } from "../utilidades/RotuloRevisao";
 import { DiscussaoNormalizada, IntervaloDestaque, PosicaoResolvida, ResultadoTrecho } from "./types";
 
 /** Nome exibido quando o GitLab não informa o autor do comentário. */
@@ -173,6 +174,7 @@ export function ConverterParaComentario(normalizada: DiscussaoNormalizada, urlMe
     return {
         id: discussao.id,
         comentario: notaPrincipal.body,
+        rotulo: GetRotuloRevisao(notaPrincipal.body),
         caminhoArquivo: posicao.caminhoArquivo,
         linha: posicao.linhaFinal ?? posicao.linhaInicial,
         lado: posicao.lado,
@@ -234,23 +236,10 @@ export function ConverterMergeRequest(mergeRequest: MergeRequestGitLab): MergeRe
 }
 
 /**
- * Ordena os comentários por arquivo e linha, deixando os comentários gerais no fim.
+ * Ordena os comentários do mais novo para o mais antigo, a mesma ordem usada no Git.
  * @param comentarios Comentários já convertidos.
  * @returns A mesma lista ordenada.
  */
 export function OrdenarComentarios(comentarios: ComentarioRevisao[]): ComentarioRevisao[] {
-    return comentarios.sort((primeiro, segundo) => {
-        const arquivoPrimeiro: string = primeiro.caminhoArquivo ?? "";
-        const arquivoSegundo: string = segundo.caminhoArquivo ?? "";
-
-        if (!arquivoPrimeiro !== !arquivoSegundo)
-            return arquivoPrimeiro ? -1 : 1;
-
-        const comparacaoArquivo: number = arquivoPrimeiro.localeCompare(arquivoSegundo);
-
-        if (comparacaoArquivo !== 0)
-            return comparacaoArquivo;
-
-        return (primeiro.linha ?? 0) - (segundo.linha ?? 0) || primeiro.criadoEm.localeCompare(segundo.criadoEm);
-    });
+    return comentarios.sort((primeiro, segundo) => segundo.criadoEm.localeCompare(primeiro.criadoEm));
 }

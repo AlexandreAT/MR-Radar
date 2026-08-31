@@ -1,5 +1,5 @@
 import { ErroApi } from "./ErroApi";
-import { CAMINHO_BASE_API, CODIGO_ERRO_COMUNICACAO, MENSAGEM_SERVICO, NOME_ERRO_CANCELAMENTO, RespostaErroApi } from "./types";
+import { CAMINHO_BASE_API, CODIGO_ERRO_COMUNICACAO, MensagemErro, MENSAGEM_SERVICO, NOME_ERRO_CANCELAMENTO, RespostaErroApi } from "./types";
 
 /**
  * Faz uma consulta GET no backend local e devolve o conteúdo já convertido.
@@ -26,6 +26,23 @@ export async function GetJson<T>(caminho: string, parametros: Record<string, str
  */
 export function EhCancelamento(falha: unknown): boolean {
     return falha instanceof DOMException && falha.name === NOME_ERRO_CANCELAMENTO;
+}
+
+/**
+ * Converte qualquer falha na mensagem que será exibida na tela.
+ * @param falha Erro capturado.
+ * @param mensagemPadrao Mensagem usada quando o erro não veio do backend.
+ * @returns Código, mensagem e dica para o usuário.
+ */
+export function ConverterErro(falha: unknown, mensagemPadrao: string): MensagemErro {
+    if (falha instanceof ErroApi)
+        return { codigo: falha.codigo, mensagem: falha.message, dica: falha.dica };
+
+    return {
+        codigo: CODIGO_ERRO_COMUNICACAO,
+        mensagem: mensagemPadrao,
+        dica: falha instanceof Error ? falha.message : "",
+    };
 }
 
 /**

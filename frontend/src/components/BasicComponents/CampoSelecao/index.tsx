@@ -1,7 +1,7 @@
-import { ContainerCampo, Opcao, RotuloCampo, Selecao } from "./styles";
+import { ContainerCampo, Grupo, Opcao, RotuloCampo, Selecao } from "./styles";
 import { LARGURA_PADRAO, PropriedadesCampoSelecao } from "./types";
 
-export function CampoSelecao({ rotulo, valor, opcoes, onChange, largura = LARGURA_PADRAO }: PropriedadesCampoSelecao) {
+export function CampoSelecao({ rotulo, valor, opcoes, grupos = [], onChange, largura = LARGURA_PADRAO }: PropriedadesCampoSelecao) {
     return (
         <ContainerCampo $largura={largura}>
             <RotuloCampo>{rotulo}</RotuloCampo>
@@ -10,6 +10,15 @@ export function CampoSelecao({ rotulo, valor, opcoes, onChange, largura = LARGUR
                     <Opcao key={opcao.valor} value={opcao.valor}>
                         {opcao.rotulo}
                     </Opcao>
+                ))}
+                {grupos.map((grupo) => (
+                    <Grupo key={grupo.rotulo} label={grupo.rotulo}>
+                        {grupo.opcoes.map((opcao) => (
+                            <Opcao key={opcao.valor} value={opcao.valor}>
+                                {opcao.rotulo}
+                            </Opcao>
+                        ))}
+                    </Grupo>
                 ))}
             </Selecao>
         </ContainerCampo>

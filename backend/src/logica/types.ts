@@ -1,4 +1,4 @@
-import { DiscussaoGitLab, NotaGitLab } from "../integracao/gitlab/types";
+import { DiscussaoGitLab, IssueGitLab, NotaGitLab } from "../integracao/gitlab/types";
 import { ErroTrecho, LadoDiff, TrechoCodigo } from "../models/Revisao/types";
 
 /** Posição de um comentário já interpretada, pronta para buscar o arquivo. */
@@ -38,4 +38,22 @@ export interface ArquivoEmCache {
     expiraEm: number;
     linhas?: string[];
     erro?: ErroTrecho;
+}
+
+/** Tempo lançado por alguém em um dia específico. */
+export interface LancamentoDeTempo {
+    data: string;
+    horas: number;
+}
+
+/**
+ * Horas encontradas em uma issue durante a montagem do resumo da semana. Guarda a issue crua, e
+ * não a já convertida, porque a elegibilidade é calculada à parte e só entra na conversão final.
+ */
+export interface HorasDaIssue {
+    issue: IssueGitLab;
+    horasNaSemana: number;
+    lancamentos: LancamentoDeTempo[];
+    horasNoFimDeSemana: number;
+    paginacaoTruncada: boolean;
 }

@@ -17,6 +17,11 @@ export const tema = {
         resolvido: "#3fb950",
         erro: "#f26d6d",
         fundoErro: "#3a1d1d",
+        rotuloIssue: "#f2564b",
+        rotuloSuggestion: "#ff8b3d",
+        rotuloNit: "#f2d94e",
+        rotuloQuestion: "#58a6ff",
+        rotuloPraise: "#3fb950",
     },
     espacamentos: {
         pequeno: "8px",

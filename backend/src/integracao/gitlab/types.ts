@@ -28,6 +28,17 @@ export enum EscopoGitLab {
     AtribuidosAMim = "assigned_to_me",
 }
 
+/** Situação de issue usada nas consultas. */
+export enum EstadoIssueGitLab {
+    Todas = "all",
+}
+
+/** Ordem em que as notas são lidas, para poder aplicá-las na sequência em que aconteceram. */
+export const ORDEM_NOTAS = {
+    CAMPO: "created_at",
+    SENTIDO: "asc",
+} as const;
+
 /** Situação de Merge Request usada nas consultas. */
 export enum EstadoMergeRequestGitLab {
     Aberto = "opened",
@@ -155,6 +166,52 @@ export interface MergeRequestListaGitLab {
     references?: ReferenciasGitLab | null;
     blocking_discussions_resolved?: boolean | null;
     user_notes_count?: number;
+}
+
+/** Usuário dono do token, como devolvido pelo GitLab. */
+export interface UsuarioGitLab {
+    id: number;
+    username: string;
+    name: string;
+    email: string;
+    commit_email?: string | null;
+}
+
+/** Contagem de tempo estimado e gasto em uma issue. */
+export interface EstatisticasTempoGitLab {
+    time_estimate: number;
+    total_time_spent: number;
+    human_time_estimate: string | null;
+    human_total_time_spent: string | null;
+}
+
+/** Issue como aparece na listagem do usuário. */
+export interface IssueGitLab {
+    id: number;
+    iid: number;
+    project_id: number;
+    title: string;
+    state: string;
+    web_url: string;
+    updated_at: string;
+    references?: ReferenciasGitLab | null;
+    time_stats?: EstatisticasTempoGitLab | null;
+}
+
+/**
+ * Merge Request relacionado a uma issue — o vínculo em que os commits de trabalho ficam.
+ * A API não devolve commits a partir da issue diretamente, só a lista de Merge Requests ligados a ela.
+ */
+export interface MergeRequestRelacionadoGitLab {
+    iid: number;
+    project_id: number;
+}
+
+/** Commit de um Merge Request, usado para descobrir em que dia o autor trabalhou na issue. */
+export interface CommitGitLab {
+    author_name: string;
+    author_email: string | null;
+    committed_date: string;
 }
 
 /** Tipo de item devolvido pela árvore do repositório. */

@@ -1,5 +1,5 @@
 import styled from "styled-components";
-import { PainelBase } from "../sharedStyles";
+import { PainelBase } from "../../sharedStyles";
 
 export const Container = styled(PainelBase)`
     display: flex;

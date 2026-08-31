@@ -4,11 +4,18 @@ export interface OpcaoSelecao {
     rotulo: string;
 }
 
+/** Conjunto de opções exibido sob um título dentro do campo de seleção. */
+export interface GrupoOpcoes {
+    rotulo: string;
+    opcoes: OpcaoSelecao[];
+}
+
 /** Propriedades aceitas pelo campo de seleção. */
 export interface PropriedadesCampoSelecao {
     rotulo: string;
     valor: string | number;
     opcoes: OpcaoSelecao[];
+    grupos?: GrupoOpcoes[];
     onChange: (valor: string) => void;
     largura?: string;
 }

@@ -1,7 +1,7 @@
 import styled from "styled-components";
-import { PainelBase } from "../sharedStyles";
+import { PainelBase } from "../../sharedStyles";
 
-export { LinkExterno, TituloBloco } from "../sharedStyles";
+export { LinkExterno, TituloBloco } from "../../sharedStyles";
 
 export const Cartao = styled(PainelBase)`
     display: flex;
@@ -15,6 +15,12 @@ export const Cabecalho = styled.header`
     align-items: center;
     justify-content: space-between;
     gap: ${({ theme }) => theme.espacamentos.pequeno};
+`;
+
+export const Etiquetas = styled.div`
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
 `;
 
 export const IdentificacaoAutor = styled.div`

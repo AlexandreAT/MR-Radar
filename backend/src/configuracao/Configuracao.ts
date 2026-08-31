@@ -1,6 +1,9 @@
 import fs from "fs";
 import path from "path";
 import dotenv from "dotenv";
+import { ErroGitLab } from "../integracao/gitlab/ErroGitLab";
+import { CodigoErroGitLab } from "../integracao/gitlab/types";
+import { StatusHttp } from "../utilidades/types";
 import { CONFIGURACAO_PADRAO, ConfiguracaoApp, LIMITE, TOKEN_EXEMPLO, VariavelEnv } from "./types";
 
 const RAIZ_BACKEND: string = path.resolve(__dirname, "..", "..");
@@ -112,6 +115,20 @@ export function ValidarConfiguracao(configuracao: ConfiguracaoApp): string[] {
         problemas.push(`A variável ${VariavelEnv.Token} ainda está com o valor de exemplo. Informe o seu token pessoal.`);
 
     return problemas;
+}
+
+/**
+ * Interrompe a consulta quando o arquivo .env não está completo.
+ * @param configuracao Configuração da aplicação.
+ * @returns Nada.
+ */
+export function GarantirConfiguracaoValida(configuracao: ConfiguracaoApp): void {
+    const problemas: string[] = ValidarConfiguracao(configuracao);
+
+    if (!problemas.length)
+        return;
+
+    throw new ErroGitLab(CodigoErroGitLab.ConfiguracaoInvalida, "O backend ainda não está configurado para acessar o GitLab.", StatusHttp.ErroInterno, problemas.join(" "));
 }
 
 /**

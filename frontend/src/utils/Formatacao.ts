@@ -14,6 +14,18 @@ const FORMATADOR_HORA = new Intl.DateTimeFormat("pt-BR", {
     second: "2-digit",
 });
 
+/** Formato usado para exibir uma quantidade de horas. */
+const FORMATADOR_HORAS = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+
+/** Marca de rastreamento de ticket que alguns títulos trazem no começo, entre colchetes. */
+const TAG_TICKET = /^\[ticket[^\]]*\]\s*/i;
+
+/**
+ * Repetição do número do ticket fora dos colchetes, que alguns títulos ainda trazem depois da tag
+ * — por exemplo "Ticket#123 — Título do chamado", já sem o "[...]" tirado antes.
+ */
+const NUMERO_TICKET_REPETIDO = /^ticket\s*#\s*[0-9a-z]+\s*[-–—:]?\s*/i;
+
 /**
  * Formata uma data ISO para o padrão brasileiro com data e hora.
  * @param dataIso Data no formato ISO devolvida pelo backend.
@@ -45,4 +57,37 @@ export function FormatarLocal(caminhoArquivo: string | null, linha: number | nul
         return "Comentário geral do Merge Request";
 
     return linha ? `${caminhoArquivo}:${linha}` : caminhoArquivo;
+}
+
+/**
+ * Formata uma data simples como dia e mês.
+ * Não usa Date porque uma data sem horário é lida como UTC e voltaria um dia em fuso negativo.
+ * @param data Data no formato AAAA-MM-DD.
+ * @returns Data no formato DD/MM, ou texto vazio quando o formato não for reconhecido.
+ */
+export function FormatarDiaMes(data: string): string {
+    const partes: string[] = data.split("-");
+
+    return partes.length === 3 ? partes[2] + "/" + partes[1] : "";
+}
+
+/**
+ * Formata uma quantidade de horas para exibição.
+ * @param horas Quantidade de horas.
+ * @returns Horas com no máximo duas casas decimais e o sufixo "h".
+ */
+export function FormatarHoras(horas: number): string {
+    return FORMATADOR_HORAS.format(horas) + "h";
+}
+
+/**
+ * Remove a tag de rastreamento de ticket do começo do título de um chamado, e a repetição do
+ * número dela fora dos colchetes, quando existirem.
+ * @param titulo Título como veio do GitLab.
+ * @returns Título sem a tag e a repetição, ou o título original quando elas ocupavam o título inteiro.
+ */
+export function LimparTituloChamado(titulo: string): string {
+    const semTag: string = titulo.replace(TAG_TICKET, "").replace(NUMERO_TICKET_REPETIDO, "").trim();
+
+    return semTag || titulo;
 }

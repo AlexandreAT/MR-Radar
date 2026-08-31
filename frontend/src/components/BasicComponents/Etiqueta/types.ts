@@ -6,10 +6,16 @@ export enum TomEtiqueta {
     Aberto = "aberto",
     Resolvido = "resolvido",
     Alerta = "alerta",
+    Issue = "issue",
+    Suggestion = "suggestion",
+    Nit = "nit",
+    Question = "question",
+    Praise = "praise",
 }
 
 /** Propriedades aceitas pela etiqueta. */
 export interface PropriedadesEtiqueta {
     children: ReactNode;
     tom?: TomEtiqueta;
+    selecionada?: boolean;
 }

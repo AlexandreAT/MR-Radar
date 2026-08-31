@@ -8,14 +8,21 @@ import {
     CabecalhoGitLab,
     CodigoErroGitLab,
     DefinicaoErroHttp,
+    CommitGitLab,
     DiscussaoGitLab,
     EscopoGitLab,
+    EstadoIssueGitLab,
     EstadoMergeRequestGitLab,
+    IssueGitLab,
     ItemArvoreGitLab,
     MergeRequestGitLab,
     MergeRequestListaGitLab,
+    MergeRequestRelacionadoGitLab,
+    NotaGitLab,
+    ORDEM_NOTAS,
     PaginaGitLab,
     TipoItemArvoreGitLab,
+    UsuarioGitLab,
 } from "./types";
 
 /** Cliente somente leitura da API v4 do GitLab. */
@@ -53,6 +60,100 @@ export class ClienteGitLab {
             order_by: "updated_at",
             sort: "desc",
         });
+    }
+
+    /**
+     * Busca o usuário dono do token.
+     * @returns Usuário autenticado na API.
+     */
+    public async GetUsuarioAtual(): Promise<UsuarioGitLab> {
+        return this.getJson<UsuarioGitLab>("/user");
+    }
+
+    /**
+     * Lista as issues atribuídas ao dono do token que foram mexidas a partir de uma data.
+     * O filtro por data de atualização é o que evita percorrer todo o histórico do usuário:
+     * qualquer issue com hora lançada na semana foi atualizada nela ou depois dela.
+     * @param atualizadasApos Data ISO a partir da qual as issues interessam.
+     * @returns Issues encontradas e indicação de paginação truncada.
+     */
+    public async GetIssuesAtribuidas(atualizadasApos: string): Promise<PaginaGitLab<IssueGitLab>> {
+        return this.getTodasPaginas<IssueGitLab>("/issues", {
+            scope: EscopoGitLab.AtribuidosAMim,
+            state: EstadoIssueGitLab.Todas,
+            updated_after: atualizadasApos,
+            order_by: "updated_at",
+            sort: "desc",
+        });
+    }
+
+    /**
+     * Busca as notas de uma issue, da mais antiga para a mais nova.
+     * A ordem importa: uma nota pode zerar todo o tempo lançado antes dela.
+     * @param projetoId ID numérico do projeto.
+     * @param issueIid IID da issue.
+     * @returns Notas encontradas e indicação de paginação truncada.
+     */
+    public async GetNotasIssue(projetoId: number, issueIid: number): Promise<PaginaGitLab<NotaGitLab>> {
+        return this.getTodasPaginas<NotaGitLab>(`/projects/${projetoId}/issues/${issueIid}/notes`, {
+            order_by: ORDEM_NOTAS.CAMPO,
+            sort: ORDEM_NOTAS.SENTIDO,
+        });
+    }
+
+    /**
+     * Lista os Merge Requests relacionados a uma issue — os que a mencionam, fecham ou têm commit
+     * ligado a ela. É o único jeito de descobrir em qual Merge Request procurar os commits de uma
+     * issue, já que a API não devolve commits a partir da issue diretamente.
+     * @param projetoId ID numérico do projeto da issue.
+     * @param issueIid IID da issue.
+     * @returns Merge Requests relacionados e indicação de paginação truncada.
+     */
+    public async GetMergeRequestsRelacionados(projetoId: number, issueIid: number): Promise<PaginaGitLab<MergeRequestRelacionadoGitLab>> {
+        return this.getTodasPaginas<MergeRequestRelacionadoGitLab>(`/projects/${projetoId}/issues/${issueIid}/related_merge_requests`);
+    }
+
+    /**
+     * Busca os commits de um Merge Request a partir de uma data, do mais novo para o mais antigo,
+     * parando assim que encontra um commit anterior à data pedida. Evita ler o histórico inteiro de
+     * um Merge Request de vida longa quando só interessam os commits dos últimos dias.
+     * @param projetoId ID numérico do projeto do Merge Request.
+     * @param mrIid IID do Merge Request.
+     * @param desde Instante ISO a partir do qual os commits interessam.
+     * @returns Commits dentro da janela e indicação de paginação truncada.
+     */
+    public async GetCommitsRecentes(projetoId: number, mrIid: number, desde: string): Promise<PaginaGitLab<CommitGitLab>> {
+        const limiteDeTempo: number = new Date(desde).getTime();
+        const itens: CommitGitLab[] = [];
+        let pagina = 1;
+
+        for (;;) {
+            const resposta: RespostaHttp = await this.executar(`/projects/${projetoId}/merge_requests/${mrIid}/commits`, { per_page: API_GITLAB.ITENS_POR_PAGINA, page: pagina });
+            const conteudo: unknown = converterJson(resposta);
+
+            if (!Array.isArray(conteudo))
+                throw new ErroGitLab(CodigoErroGitLab.RespostaInesperada, "O GitLab devolveu uma resposta em formato inesperado.", StatusHttp.GatewayInvalido);
+
+            const commits: CommitGitLab[] = conteudo as CommitGitLab[];
+            itens.push(...commits);
+
+            const maisAntigo: CommitGitLab | undefined = commits[commits.length - 1];
+
+            // Os commits vêm do mais novo para o mais antigo: assim que um deles for anterior à
+            // janela, os das próximas páginas também serão, e não há razão para continuar lendo.
+            if (!maisAntigo || new Date(maisAntigo.committed_date).getTime() < limiteDeTempo)
+                return { itens, truncada: false };
+
+            const proximaPagina: number = Number.parseInt(String(resposta.cabecalhos[CabecalhoGitLab.ProximaPagina] ?? ""), 10);
+
+            if (!Number.isFinite(proximaPagina) || proximaPagina <= 0)
+                return { itens, truncada: false };
+
+            if (pagina >= this.configuracao.maxPaginas)
+                return { itens, truncada: true };
+
+            pagina = proximaPagina;
+        }
     }
 
     /**

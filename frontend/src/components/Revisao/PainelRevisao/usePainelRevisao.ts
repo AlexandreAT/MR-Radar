@@ -1,42 +1,41 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GetComentariosRevisao, GetConfiguracaoDashboard, GetMeusMergeRequests } from "src/api/Revisao";
+import { GetComentariosRevisao, GetMeusMergeRequests } from "src/api/Revisao";
 import { ComentarioRevisao, ConfiguracaoDashboard, EscopoMergeRequest, ListaMergeRequestsAbertos, MergeRequestAberto, RevisaoMergeRequest, StatusFiltro } from "src/api/Revisao/types";
-import { EhCancelamento } from "src/services";
-import { ErroApi } from "src/services/ErroApi";
-import { CODIGO_ERRO_COMUNICACAO } from "src/services/types";
+import { ConverterErro, EhCancelamento } from "src/services";
+import { CODIGO_ERRO_COMUNICACAO, MensagemErro } from "src/services/types";
 import { FormatarComentariosParaCopia } from "src/utils/ComentariosParaCopia";
+import {
+    EscopoCobreSituacao,
+    FiltrarComentarios,
+    OrdenacaoComentarios,
+    OrdenarComentarios,
+    RECORTE_TODOS,
+    SITUACAO_POR_STATUS,
+    SituacaoComentario,
+} from "src/utils/ComentariosRevisao";
 import { FormatarHora } from "src/utils/Formatacao";
 import { ExtrairDadosDaUrl } from "src/utils/MergeRequestUrl";
-import {
-    ChavePreferencia,
-    CODIGOS_ERRO_PERMANENTE,
-    ESPERA_ENTRE_TENTATIVAS_MS,
-    EstadoCopia,
-    INTERVALO_PADRAO_SEGUNDOS,
-    MENSAGEM,
-    MensagemErro,
-    MILISSEGUNDOS_POR_SEGUNDO,
-    OpcoesBusca,
-    TEMPO_RETORNO_COPIA_MS,
-    TENTATIVAS_CONFIGURACAO,
-} from "./types";
+import { ChavePreferencia, GetPreferencia, SalvarPreferencia } from "src/utils/Preferencias";
+import { CODIGOS_ERRO_PERMANENTE, EstadoCopia, INTERVALO_PADRAO_SEGUNDOS, MENSAGEM, MILISSEGUNDOS_POR_SEGUNDO, OpcoesBusca, TEMPO_RETORNO_COPIA_MS } from "./types";
 
 /**
  * Concentra o estado e as consultas da tela de revisão.
+ * @param configuracao Configuração do backend, já carregada pelo aplicativo.
  * @returns Estado da tela, Merge Requests do usuário, comentários e os manipuladores usados pelos componentes.
  */
-export function usePainelRevisao() {
-    const [configuracao, setConfiguracao] = useState<ConfiguracaoDashboard | null>(null);
-    const [projetoId, setProjetoId] = useState<string>(() => getPreferencia(ChavePreferencia.ProjetoId));
-    const [mrIid, setMrIid] = useState<string>(() => getPreferencia(ChavePreferencia.MrIid));
+export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
+    const [projetoId, setProjetoId] = useState<string>(() => GetPreferencia(ChavePreferencia.ProjetoId));
+    const [mrIid, setMrIid] = useState<string>(() => GetPreferencia(ChavePreferencia.MrIid));
     const [status, setStatus] = useState<StatusFiltro>(StatusFiltro.Abertos);
+    const [situacao, setSituacao] = useState<SituacaoComentario | null>(SITUACAO_POR_STATUS[StatusFiltro.Abertos]);
+    const [ordenacao, setOrdenacao] = useState<OrdenacaoComentarios>(OrdenacaoComentarios.MaisRecentes);
+    const [recorte, setRecorte] = useState<string>(RECORTE_TODOS);
     const [atualizacaoAutomatica, setAtualizacaoAutomatica] = useState<boolean>(false);
     const [intervaloSegundos, setIntervaloSegundos] = useState<number>(INTERVALO_PADRAO_SEGUNDOS);
     const [revisao, setRevisao] = useState<RevisaoMergeRequest | null>(null);
     const [carregando, setCarregando] = useState<boolean>(false);
     const [erro, setErro] = useState<MensagemErro | null>(null);
     const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string>("");
-    const [mostrarGerais, setMostrarGerais] = useState<boolean>(false);
     const [estadoCopia, setEstadoCopia] = useState<EstadoCopia>(EstadoCopia.Ocioso);
 
     const [escopo, setEscopo] = useState<EscopoMergeRequest>(EscopoMergeRequest.CriadosPorMim);
@@ -52,53 +51,15 @@ export function usePainelRevisao() {
     const podeBuscar: boolean = useMemo(() => Boolean(projetoId.trim() && mrIid.trim()), [projetoId, mrIid]);
     const configuracaoValida: boolean = Boolean(configuracao && configuracao.problemas.length === 0);
 
-    // Comentários gerais (sem posição de código) ficam separados: só aparecem na tela
-    // quando o usuário clica para revelá-los, em vez de virem misturados na lista principal.
-    const comentariosPrincipais: ComentarioRevisao[] = useMemo(() => revisao?.comentarios.filter((comentario) => comentario.resolvivel) ?? [], [revisao]);
-    const comentariosGerais: ComentarioRevisao[] = useMemo(() => revisao?.comentarios.filter((comentario) => !comentario.resolvivel) ?? [], [revisao]);
+    // A lista exibida é sempre a que sobrou dos filtros da tela, na ordem escolhida.
+    const comentarios: ComentarioRevisao[] = useMemo(
+        () => OrdenarComentarios(FiltrarComentarios(revisao?.comentarios ?? [], situacao, recorte), ordenacao),
+        [revisao, situacao, recorte, ordenacao],
+    );
 
-    useEffect(() => {
-        let cancelado = false;
+    useEffect(() => SalvarPreferencia(ChavePreferencia.ProjetoId, projetoId), [projetoId]);
 
-        /**
-         * Carrega a configuração, repetindo enquanto o backend ainda estiver subindo.
-         * Só insiste quando a falha é de conexão: erro vindo do backend aparece na hora.
-         * @returns Nada.
-         */
-        async function carregarConfiguracao(): Promise<void> {
-            for (let tentativa = 1; !cancelado; tentativa += 1) {
-                try {
-                    const dados: ConfiguracaoDashboard = await GetConfiguracaoDashboard();
-
-                    if (!cancelado)
-                        setConfiguracao(dados);
-
-                    return;
-                } catch (falha: unknown) {
-                    const backendAindaSubindo: boolean = falha instanceof ErroApi && falha.codigo === CODIGO_ERRO_COMUNICACAO;
-
-                    if (!backendAindaSubindo || tentativa >= TENTATIVAS_CONFIGURACAO) {
-                        if (!cancelado)
-                            setErro(converterErro(falha, MENSAGEM.ERRO_INESPERADO));
-
-                        return;
-                    }
-
-                    await esperar(ESPERA_ENTRE_TENTATIVAS_MS);
-                }
-            }
-        }
-
-        void carregarConfiguracao();
-
-        return () => {
-            cancelado = true;
-        };
-    }, []);
-
-    useEffect(() => salvarPreferencia(ChavePreferencia.ProjetoId, projetoId), [projetoId]);
-
-    useEffect(() => salvarPreferencia(ChavePreferencia.MrIid, mrIid), [mrIid]);
+    useEffect(() => SalvarPreferencia(ChavePreferencia.MrIid, mrIid), [mrIid]);
 
     useEffect(
         () => () => {
@@ -132,7 +93,7 @@ export function usePainelRevisao() {
                 return;
 
             setMeusMergeRequests([]);
-            setErroLista(converterErro(falha, MENSAGEM.ERRO_LISTA));
+            setErroLista(ConverterErro(falha, MENSAGEM.ERRO_LISTA));
         } finally {
             if (requisicaoDaLista.current === controlador) {
                 requisicaoDaLista.current = null;
@@ -149,6 +110,7 @@ export function usePainelRevisao() {
         async (opcoes: OpcoesBusca = {}) => {
             const projeto: string = (opcoes.projetoId ?? projetoId).trim();
             const iid: string = (opcoes.mrIid ?? mrIid).trim();
+            const statusBusca: StatusFiltro = opcoes.status ?? status;
             const silenciosa: boolean = opcoes.silenciosa ?? false;
 
             if (!projeto || !iid) {
@@ -169,7 +131,7 @@ export function usePainelRevisao() {
                 setCarregando(true);
 
             try {
-                const dados: RevisaoMergeRequest = await GetComentariosRevisao({ projetoId: projeto, mrIid: iid, status }, controlador.signal);
+                const dados: RevisaoMergeRequest = await GetComentariosRevisao({ projetoId: projeto, mrIid: iid, status: statusBusca }, controlador.signal);
 
                 setRevisao(dados);
                 setErro(null);
@@ -215,7 +177,7 @@ export function usePainelRevisao() {
      * @returns Nada.
      */
     function tratarFalha(falha: unknown, silenciosa: boolean): void {
-        const mensagemErro: MensagemErro = converterErro(falha, MENSAGEM.ERRO_INESPERADO);
+        const mensagemErro: MensagemErro = ConverterErro(falha, MENSAGEM.ERRO_INESPERADO);
         setErro(mensagemErro);
 
         // Numa busca manual o resultado antigo é de outro Merge Request ou de outro filtro,
@@ -239,7 +201,7 @@ export function usePainelRevisao() {
 
         setProjetoId(mergeRequest.projetoId);
         setMrIid(iid);
-        setMostrarGerais(false);
+        setRecorte(RECORTE_TODOS);
         void buscar({ projetoId: mergeRequest.projetoId, mrIid: iid });
     }
 
@@ -261,12 +223,45 @@ export function usePainelRevisao() {
     }
 
     /**
-     * Aplica o status escolhido no campo de seleção.
+     * Aplica o status escolhido no campo de seleção e recarrega o Merge Request já exibido.
      * @param valor Valor devolvido pelo campo.
      * @returns Nada.
      */
     function handleAlterarStatus(valor: string): void {
-        setStatus(valor as StatusFiltro);
+        const novoStatus: StatusFiltro = valor as StatusFiltro;
+
+        setStatus(novoStatus);
+        setSituacao(SITUACAO_POR_STATUS[novoStatus]);
+
+        // Sem resultado na tela não há o que recarregar: a consulta sai quando o usuário clicar em Buscar.
+        if (revisao)
+            void buscar({ status: novoStatus });
+    }
+
+    /**
+     * Filtra a lista pela situação do contador clicado no resumo.
+     * @param novaSituacao Situação escolhida, ou nulo para exibir todas.
+     * @returns Nada.
+     */
+    function handleAlterarSituacao(novaSituacao: SituacaoComentario | null): void {
+        setSituacao(novaSituacao);
+
+        // Nem todo escopo de busca traz todas as situações do servidor: pedir uma situação que
+        // ficou de fora exige consultar o Merge Request de novo, agora sem limitar o status.
+        if (EscopoCobreSituacao(status, novaSituacao))
+            return;
+
+        setStatus(StatusFiltro.Todos);
+        void buscar({ status: StatusFiltro.Todos });
+    }
+
+    /**
+     * Aplica a ordenação escolhida no campo de seleção.
+     * @param valor Valor devolvido pelo campo.
+     * @returns Nada.
+     */
+    function handleAlterarOrdenacao(valor: string): void {
+        setOrdenacao(valor as OrdenacaoComentarios);
     }
 
     /**
@@ -300,27 +295,16 @@ export function usePainelRevisao() {
      * @returns Nada.
      */
     function handleBuscar(): void {
-        setMostrarGerais(false);
         void buscar();
     }
 
     /**
-     * Mostra ou esconde os comentários gerais na tela.
-     * @returns Nada.
-     */
-    function handleAlternarGerais(): void {
-        setMostrarGerais((atual) => !atual);
-    }
-
-    /**
-     * Copia todos os comentários do Merge Request atual, prontos para colar em outro lugar.
+     * Copia os comentários que estão na tela, prontos para colar em outro lugar.
      * @returns Nada.
      */
     async function handleCopiarComentarios(): Promise<void> {
-        const todosComentarios = [...comentariosPrincipais, ...comentariosGerais];
-
         try {
-            await navigator.clipboard.writeText(FormatarComentariosParaCopia(todosComentarios));
+            await navigator.clipboard.writeText(FormatarComentariosParaCopia(comentarios));
             setEstadoCopia(EstadoCopia.Copiado);
         } catch {
             setEstadoCopia(EstadoCopia.Falhou);
@@ -333,10 +317,12 @@ export function usePainelRevisao() {
     }
 
     return {
-        configuracao,
         projetoId,
         mrIid,
         status,
+        situacao,
+        ordenacao,
+        recorte,
         atualizacaoAutomatica,
         intervaloSegundos,
         revisao,
@@ -344,9 +330,8 @@ export function usePainelRevisao() {
         erro,
         ultimaAtualizacao,
         temResultado: Boolean(revisao),
-        comentariosPrincipais,
-        comentariosGerais,
-        mostrarGerais,
+        comentarios,
+        textoContador: montarTextoContador(comentarios.length),
         estadoCopia,
         escopo,
         meusMergeRequests,
@@ -355,67 +340,26 @@ export function usePainelRevisao() {
         erroLista,
         handleAlterarProjeto,
         handleAlterarStatus,
+        handleAlterarSituacao,
+        handleAlterarOrdenacao,
         handleAlterarIntervalo,
         handleAlterarEscopo,
         handleAtualizarLista,
         handleSelecionarMergeRequest,
         handleBuscar,
-        handleAlternarGerais,
         handleCopiarComentarios,
         setMrIid,
+        setRecorte,
         setAtualizacaoAutomatica,
     };
 }
 
 /**
- * Aguarda um intervalo de tempo.
- * @param milissegundos Tempo de espera.
- * @returns Promise concluída após o tempo informado.
+ * Monta o texto do contador de comentários que estão na tela.
+ * @param quantidade Quantidade de comentários exibidos.
+ * @returns Texto com a quantidade e a palavra no singular ou no plural.
  */
-function esperar(milissegundos: number): Promise<void> {
-    return new Promise((resolver) => window.setTimeout(resolver, milissegundos));
+function montarTextoContador(quantidade: number): string {
+    return `${quantidade} ${quantidade === 1 ? MENSAGEM.CONTADOR_EXIBIDO : MENSAGEM.CONTADOR_EXIBIDOS}`;
 }
 
-/**
- * Lê um valor lembrado da última sessão.
- * @param chave Chave da preferência.
- * @returns Valor guardado ou texto vazio.
- */
-function getPreferencia(chave: ChavePreferencia): string {
-    try {
-        return window.localStorage.getItem(chave) ?? "";
-    } catch {
-        return "";
-    }
-}
-
-/**
- * Guarda um valor para a próxima sessão.
- * @param chave Chave da preferência.
- * @param valor Valor a guardar.
- * @returns Nada.
- */
-function salvarPreferencia(chave: ChavePreferencia, valor: string): void {
-    try {
-        window.localStorage.setItem(chave, valor);
-    } catch {
-        // Navegador com armazenamento bloqueado: a tela continua funcionando sem lembrar os campos.
-    }
-}
-
-/**
- * Converte qualquer falha na mensagem que será exibida na tela.
- * @param falha Erro capturado.
- * @param mensagemPadrao Mensagem usada quando o erro não veio do backend.
- * @returns Código, mensagem e dica para o usuário.
- */
-function converterErro(falha: unknown, mensagemPadrao: string): MensagemErro {
-    if (falha instanceof ErroApi)
-        return { codigo: falha.codigo, mensagem: falha.message, dica: falha.dica };
-
-    return {
-        codigo: CODIGO_ERRO_COMUNICACAO,
-        mensagem: mensagemPadrao,
-        dica: falha instanceof Error ? falha.message : "",
-    };
-}

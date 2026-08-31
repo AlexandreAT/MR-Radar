@@ -1,15 +1,8 @@
-import { Etiqueta, TomEtiqueta } from "src/components/BasicComponents";
+import { Etiqueta } from "src/components/BasicComponents";
 import { BotaoContador, Branches, Contadores, Container, Detalhes, Informacao, LinkExterno, Titulo } from "./styles";
-import { PropriedadesResumoMergeRequest, TEXTO_RESUMO } from "./types";
+import { CONTADORES, PropriedadesResumoMergeRequest, TEXTO_RESUMO } from "./types";
 
-export function ResumoMergeRequest({ mergeRequest, contagem, mostrarGerais, podeAlternarGerais, onAlternarGerais }: PropriedadesResumoMergeRequest) {
-    const etiquetaGerais = (
-        <Etiqueta>
-            {contagem.naoResolviveis} {TEXTO_RESUMO.GERAIS}
-            {podeAlternarGerais && ` ${mostrarGerais ? TEXTO_RESUMO.SETA_ABERTA : TEXTO_RESUMO.SETA_FECHADA}`}
-        </Etiqueta>
-    );
-
+export function ResumoMergeRequest({ mergeRequest, contagem, situacao, onAlterarSituacao }: PropriedadesResumoMergeRequest) {
     return (
         <Container>
             <Titulo>
@@ -23,22 +16,13 @@ export function ResumoMergeRequest({ mergeRequest, contagem, mostrarGerais, pode
                 </Branches>
             </Detalhes>
             <Contadores>
-                <Etiqueta tom={TomEtiqueta.Aberto}>
-                    {contagem.abertos} {TEXTO_RESUMO.ABERTOS}
-                </Etiqueta>
-                <Etiqueta tom={TomEtiqueta.Resolvido}>
-                    {contagem.resolvidos} {TEXTO_RESUMO.RESOLVIDOS}
-                </Etiqueta>
-                {podeAlternarGerais ? (
-                    <BotaoContador type="button" onClick={onAlternarGerais}>
-                        {etiquetaGerais}
+                {CONTADORES.map((contador) => (
+                    <BotaoContador key={contador.chave} type="button" onClick={() => onAlterarSituacao(contador.situacao)}>
+                        <Etiqueta tom={contador.tom} selecionada={situacao === contador.situacao}>
+                            {contagem[contador.chave]} {contador.texto}
+                        </Etiqueta>
                     </BotaoContador>
-                ) : (
-                    etiquetaGerais
-                )}
-                <Etiqueta>
-                    {contagem.total} {TEXTO_RESUMO.TOTAL}
-                </Etiqueta>
+                ))}
             </Contadores>
             <LinkExterno href={mergeRequest.url} target="_blank" rel="noreferrer">
                 {TEXTO_RESUMO.LINK_GITLAB}

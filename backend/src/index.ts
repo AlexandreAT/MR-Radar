@@ -1,7 +1,9 @@
 import express, { Express } from "express";
 import { configuracao, ValidarConfiguracao } from "./configuracao/Configuracao";
+import { CriarRotasHoras } from "./controllers/HorasController";
 import { CriarRotasRevisao } from "./controllers/RevisaoController";
 import { ClienteGitLab } from "./integracao/gitlab/ClienteGitLab";
+import { LogicaHoras } from "./logica/LogicaHoras";
 import { LogicaMergeRequest } from "./logica/LogicaMergeRequest";
 import { LogicaRevisao } from "./logica/LogicaRevisao";
 import { LogicaTrechoCodigo } from "./logica/LogicaTrechoCodigo";
@@ -20,12 +22,14 @@ function criarAplicacao(): Express {
     const logicaTrechoCodigo = new LogicaTrechoCodigo(cliente, configuracao);
     const logicaRevisao = new LogicaRevisao(cliente, logicaTrechoCodigo, configuracao);
     const logicaMergeRequest = new LogicaMergeRequest(cliente);
+    const logicaHoras = new LogicaHoras(cliente, configuracao);
 
     const aplicacao: Express = express();
     aplicacao.disable("x-powered-by");
     aplicacao.use(LiberarOrigemLocal);
     aplicacao.use(SomenteLeitura);
     aplicacao.use(PREFIXO_API, CriarRotasRevisao(logicaRevisao, logicaMergeRequest, configuracao));
+    aplicacao.use(PREFIXO_API, CriarRotasHoras(logicaHoras, configuracao));
     aplicacao.use(RotaNaoEncontrada);
     aplicacao.use(TratadorDeErros);
 

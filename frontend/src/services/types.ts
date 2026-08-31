@@ -13,6 +13,13 @@ export const MENSAGEM_SERVICO = {
     DICA_SEM_BACKEND: "Confirme se o backend está rodando com npm run dev.",
 } as const;
 
+/** Erro já pronto para ser exibido na tela. */
+export interface MensagemErro {
+    codigo: string;
+    mensagem: string;
+    dica: string;
+}
+
 /** Estrutura de erro devolvida pelo backend. */
 export interface RespostaErroApi {
     erro?: {

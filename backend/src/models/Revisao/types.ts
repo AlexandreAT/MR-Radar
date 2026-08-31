@@ -5,6 +5,18 @@ export enum StatusFiltro {
     Todos = "todos",
 }
 
+/**
+ * Rótulo de revisão que o autor escreve no começo do comentário, no padrão de
+ * conventional comments. Os itens estão do pior para o melhor.
+ */
+export enum RotuloRevisao {
+    Issue = "issue",
+    Suggestion = "suggestion",
+    Nit = "nit",
+    Question = "question",
+    Praise = "praise",
+}
+
 /** Lado do diff em que o comentário foi ancorado. */
 export enum LadoDiff {
     Novo = "novo",
@@ -66,6 +78,7 @@ export interface RespostaComentario {
 export interface ComentarioRevisao {
     id: string;
     comentario: string;
+    rotulo: RotuloRevisao | null;
     caminhoArquivo: string | null;
     linha: number | null;
     lado: LadoDiff | null;

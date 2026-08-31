@@ -1,34 +1,21 @@
-import { Botao, Etiqueta, TomEtiqueta } from "src/components/BasicComponents";
+import { Botao } from "src/components/BasicComponents";
 import { CartaoComentario } from "src/components/Revisao/CartaoComentario";
+import { FiltroComentarios } from "src/components/Revisao/FiltroComentarios";
 import { FiltroRevisao } from "src/components/Revisao/FiltroRevisao";
 import { ListaMergeRequests } from "src/components/Revisao/ListaMergeRequests";
 import { ResumoMergeRequest } from "src/components/Revisao/ResumoMergeRequest";
-import { TituloBloco } from "src/components/Revisao/sharedStyles";
-import {
-    BlocoTitulo,
-    Cabecalho,
-    CaixaAviso,
-    CaixaErro,
-    DicaErro,
-    EnderecoGitLab,
-    LinhaAcoes,
-    Lista,
-    Pagina,
-    Subtitulo,
-    TextoAviso,
-    TextoErro,
-    Titulo,
-    Vazio,
-} from "./styles";
-import { MENSAGEM, TEXTO_POR_ESTADO_COPIA } from "./types";
+import { CaixaAviso, CaixaErro, ContadorExibidos, DicaErro, LinhaAcoes, Lista, Pagina, TextoAviso, TextoErro, Vazio } from "./styles";
+import { MENSAGEM, PropriedadesPainelRevisao, TEXTO_POR_ESTADO_COPIA } from "./types";
 import { usePainelRevisao } from "./usePainelRevisao";
 
-export function PainelRevisao() {
+export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
     const {
-        configuracao,
         projetoId,
         mrIid,
         status,
+        situacao,
+        ordenacao,
+        recorte,
         atualizacaoAutomatica,
         intervaloSegundos,
         revisao,
@@ -36,9 +23,8 @@ export function PainelRevisao() {
         erro,
         ultimaAtualizacao,
         temResultado,
-        comentariosPrincipais,
-        comentariosGerais,
-        mostrarGerais,
+        comentarios,
+        textoContador,
         estadoCopia,
         escopo,
         meusMergeRequests,
@@ -47,38 +33,21 @@ export function PainelRevisao() {
         erroLista,
         handleAlterarProjeto,
         handleAlterarStatus,
+        handleAlterarSituacao,
+        handleAlterarOrdenacao,
         handleAlterarIntervalo,
         handleAlterarEscopo,
         handleAtualizarLista,
         handleSelecionarMergeRequest,
         handleBuscar,
-        handleAlternarGerais,
         handleCopiarComentarios,
         setMrIid,
+        setRecorte,
         setAtualizacaoAutomatica,
-    } = usePainelRevisao();
+    } = usePainelRevisao(configuracao);
 
     return (
         <Pagina>
-            <Cabecalho>
-                <BlocoTitulo>
-                    <Titulo>{MENSAGEM.TITULO}</Titulo>
-                    <Subtitulo>{MENSAGEM.SUBTITULO}</Subtitulo>
-                </BlocoTitulo>
-                <Etiqueta tom={TomEtiqueta.Resolvido}>{MENSAGEM.ETIQUETA_SOMENTE_LEITURA}</Etiqueta>
-            </Cabecalho>
-
-            {configuracao?.urlGitLab && <EnderecoGitLab>{configuracao.urlGitLab}</EnderecoGitLab>}
-
-            {configuracao && configuracao.problemas.length > 0 && (
-                <CaixaAviso>
-                    <TextoAviso>{MENSAGEM.BACKEND_NAO_CONFIGURADO}</TextoAviso>
-                    {configuracao.problemas.map((problema) => (
-                        <TextoAviso key={problema}>{problema}</TextoAviso>
-                    ))}
-                </CaixaAviso>
-            )}
-
             {erroLista && (
                 <CaixaErro>
                     <TextoErro>{erroLista.mensagem}</TextoErro>
@@ -123,17 +92,26 @@ export function PainelRevisao() {
             )}
 
             {revisao && (
-                <ResumoMergeRequest
-                    mergeRequest={revisao.mergeRequest}
-                    contagem={revisao.contagem}
-                    mostrarGerais={mostrarGerais}
-                    podeAlternarGerais={comentariosGerais.length > 0}
-                    onAlternarGerais={handleAlternarGerais}
-                />
+                <>
+                    <ResumoMergeRequest
+                        mergeRequest={revisao.mergeRequest}
+                        contagem={revisao.contagem}
+                        situacao={situacao}
+                        onAlterarSituacao={handleAlterarSituacao}
+                    />
+                    <FiltroComentarios
+                        comentarios={revisao.comentarios}
+                        ordenacao={ordenacao}
+                        recorte={recorte}
+                        onAlterarOrdenacao={handleAlterarOrdenacao}
+                        onAlterarRecorte={setRecorte}
+                    />
+                </>
             )}
 
-            {revisao && (comentariosPrincipais.length > 0 || comentariosGerais.length > 0) && (
+            {comentarios.length > 0 && (
                 <LinhaAcoes>
+                    <ContadorExibidos>{textoContador}</ContadorExibidos>
                     <Botao onClick={handleCopiarComentarios}>{TEXTO_POR_ESTADO_COPIA[estadoCopia]}</Botao>
                 </LinhaAcoes>
             )}
@@ -146,24 +124,13 @@ export function PainelRevisao() {
 
             {!revisao && !erro && <Vazio>{MENSAGEM.SEM_BUSCA}</Vazio>}
 
-            {revisao && comentariosPrincipais.length === 0 && <Vazio>{MENSAGEM.SEM_COMENTARIOS}</Vazio>}
+            {revisao && comentarios.length === 0 && <Vazio>{MENSAGEM.SEM_COMENTARIOS}</Vazio>}
 
             <Lista>
-                {comentariosPrincipais.map((comentario) => (
+                {comentarios.map((comentario) => (
                     <CartaoComentario key={comentario.id} comentario={comentario} />
                 ))}
             </Lista>
-
-            {mostrarGerais && comentariosGerais.length > 0 && (
-                <>
-                    <TituloBloco>{MENSAGEM.TITULO_GERAIS}</TituloBloco>
-                    <Lista>
-                        {comentariosGerais.map((comentario) => (
-                            <CartaoComentario key={comentario.id} comentario={comentario} />
-                        ))}
-                    </Lista>
-                </>
-            )}
         </Pagina>
     );
 }

@@ -1,7 +1,7 @@
 import styled from "styled-components";
-import { PainelBase } from "../sharedStyles";
+import { PainelBase } from "../../sharedStyles";
 
-export { LinkExterno } from "../sharedStyles";
+export { LinkExterno } from "../../sharedStyles";
 
 export const Container = styled(PainelBase)`
     display: flex;
@@ -40,5 +40,6 @@ export const Contadores = styled.div`
 
 export const BotaoContador = styled.button`
     all: unset;
+    display: inline-flex;
     cursor: pointer;
 `;

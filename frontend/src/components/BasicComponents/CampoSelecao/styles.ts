@@ -10,3 +10,5 @@ export const Selecao = styled.select`
 `;
 
 export const Opcao = styled.option``;
+
+export const Grupo = styled.optgroup``;

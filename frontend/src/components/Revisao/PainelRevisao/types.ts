@@ -1,10 +1,4 @@
-import { CodigoErroBackend } from "src/api/Revisao/types";
-
-/** Chaves usadas para lembrar o que foi digitado na tela. */
-export enum ChavePreferencia {
-    ProjetoId = "mr-radar:projetoId",
-    MrIid = "mr-radar:mrIid",
-}
+import { CodigoErroBackend, ConfiguracaoDashboard, StatusFiltro } from "src/api/Revisao/types";
 
 /** Estado do botão de copiar comentários, para dar retorno visual do clique. */
 export enum EstadoCopia {
@@ -18,15 +12,6 @@ export const TEMPO_RETORNO_COPIA_MS = 2000;
 
 /** Intervalo inicial da atualização automática, em segundos. */
 export const INTERVALO_PADRAO_SEGUNDOS = 30;
-
-/**
- * Tentativas de carregar a configuração ao abrir a tela. O backend leva alguns segundos
- * a mais que o frontend para ficar de pé, então as primeiras chamadas podem ser recusadas.
- */
-export const TENTATIVAS_CONFIGURACAO = 10;
-
-/** Espera entre as tentativas de carregar a configuração, em milissegundos. */
-export const ESPERA_ENTRE_TENTATIVAS_MS = 1000;
 
 /** Fator de conversão do intervalo escolhido na tela para o temporizador. */
 export const MILISSEGUNDOS_POR_SEGUNDO = 1000;
@@ -46,17 +31,14 @@ export const CODIGOS_ERRO_PERMANENTE: string[] = [
 
 /** Mensagens exibidas no painel. */
 export const MENSAGEM = {
-    TITULO: "MR Radar",
-    SUBTITULO: "",
-    ETIQUETA_SOMENTE_LEITURA: "Somente leitura",
     CAMPOS_OBRIGATORIOS: "Informe o Project ID e o IID do Merge Request para buscar.",
     ERRO_INESPERADO: "Não foi possível carregar os comentários.",
     ERRO_LISTA: "Não foi possível carregar os seus Merge Requests.",
     SEM_BUSCA: "Escolha um Merge Request na lista acima, ou informe o Project ID e o IID e clique em Buscar.",
     SEM_COMENTARIOS: "Nenhum comentário encontrado para este filtro.",
     PAGINACAO_TRUNCADA: "Havia mais páginas de comentários do que o limite configurado. Aumente MAX_PAGES no arquivo .env.",
-    BACKEND_NAO_CONFIGURADO: "O backend ainda não está configurado.",
-    TITULO_GERAIS: "Comentários gerais",
+    CONTADOR_EXIBIDO: "comentário exibido",
+    CONTADOR_EXIBIDOS: "comentários exibidos",
 } as const;
 
 /** Texto do botão de copiar comentários, conforme o estado do clique. */
@@ -66,11 +48,9 @@ export const TEXTO_POR_ESTADO_COPIA: Record<EstadoCopia, string> = {
     [EstadoCopia.Falhou]: "Não foi possível copiar",
 };
 
-/** Erro exibido na tela. */
-export interface MensagemErro {
-    codigo: string;
-    mensagem: string;
-    dica: string;
+/** Propriedades aceitas pela página de revisão. */
+export interface PropriedadesPainelRevisao {
+    configuracao: ConfiguracaoDashboard | null;
 }
 
 /**
@@ -80,5 +60,6 @@ export interface MensagemErro {
 export interface OpcoesBusca {
     projetoId?: string;
     mrIid?: string;
+    status?: StatusFiltro;
     silenciosa?: boolean;
 }

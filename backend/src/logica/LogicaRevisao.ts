@@ -27,7 +27,7 @@ export class LogicaRevisao {
     /**
      * Busca os comentários de revisão de um Merge Request, já com o trecho de código de cada um.
      * @param parametros Projeto, Merge Request e filtros da consulta.
-     * @returns Merge Request, contagem por situação e comentários ordenados por arquivo e linha.
+     * @returns Merge Request, contagem por situação e comentários do mais novo para o mais antigo.
      */
     public async GetRevisao(parametros: ParametrosConsultaRevisao): Promise<RevisaoMergeRequest> {
         const [mergeRequest, paginaDiscussoes] = await Promise.all([

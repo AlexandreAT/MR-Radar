@@ -7,6 +7,7 @@ import {
     Cartao,
     CorpoResposta,
     DataComentario,
+    Etiquetas,
     IdentificacaoAutor,
     ItemResposta,
     LinkExterno,
@@ -22,7 +23,7 @@ import { PropriedadesCartaoComentario, TEXTO_CARTAO } from "./types";
 import { useCartaoComentario } from "./useCartaoComentario";
 
 export function CartaoComentario({ comentario }: PropriedadesCartaoComentario) {
-    const { aparencia, dataFormatada, local, temRespostas } = useCartaoComentario(comentario);
+    const { situacao, rotulo, dataFormatada, local, temRespostas } = useCartaoComentario(comentario);
 
     return (
         <Cartao>
@@ -31,7 +32,10 @@ export function CartaoComentario({ comentario }: PropriedadesCartaoComentario) {
                     <NomeAutor>{comentario.autor.nome}</NomeAutor>
                     <DataComentario>{dataFormatada}</DataComentario>
                 </IdentificacaoAutor>
-                <Etiqueta tom={aparencia.tom}>{aparencia.rotulo}</Etiqueta>
+                <Etiquetas>
+                    {rotulo && <Etiqueta tom={rotulo.tom}>{rotulo.rotulo}</Etiqueta>}
+                    <Etiqueta tom={situacao.tom}>{situacao.rotulo}</Etiqueta>
+                </Etiquetas>
             </Cabecalho>
 
             <Secao>

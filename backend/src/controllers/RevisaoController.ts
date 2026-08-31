@@ -1,6 +1,6 @@
 import { Request, Response, Router } from "express";
 import { ConfiguracaoApp, LIMITE } from "../configuracao/types";
-import { ValidarConfiguracao } from "../configuracao/Configuracao";
+import { GarantirConfiguracaoValida, ValidarConfiguracao } from "../configuracao/Configuracao";
 import { ErroGitLab } from "../integracao/gitlab/ErroGitLab";
 import { CodigoErroGitLab } from "../integracao/gitlab/types";
 import { LogicaMergeRequest } from "../logica/LogicaMergeRequest";
@@ -39,7 +39,7 @@ export function CriarRotasRevisao(logicaRevisao: LogicaRevisao, logicaMergeReque
     rotas.get(
         "/merge-requests",
         Envolver(async (requisicao: Request, resposta: Response) => {
-            validarConfiguracao(configuracao);
+            GarantirConfiguracaoValida(configuracao);
 
             const lista: ListaMergeRequestsAbertos = await logicaMergeRequest.GetAbertos(lerEscopo(requisicao));
 
@@ -50,7 +50,7 @@ export function CriarRotasRevisao(logicaRevisao: LogicaRevisao, logicaMergeReque
     rotas.get(
         "/merge-request/:projectId/:mrIid/open-discussions",
         Envolver(async (requisicao: Request, resposta: Response) => {
-            validarConfiguracao(configuracao);
+            GarantirConfiguracaoValida(configuracao);
 
             const parametros: ParametrosConsultaRevisao = lerParametros(requisicao, configuracao);
             const revisao: RevisaoMergeRequest = await logicaRevisao.GetRevisao(parametros);
@@ -75,20 +75,6 @@ function montarConfiguracaoDashboard(configuracao: ConfiguracaoApp): Configuraca
         somenteLeitura: true,
         problemas: ValidarConfiguracao(configuracao),
     };
-}
-
-/**
- * Interrompe a consulta quando o arquivo .env não está completo.
- * @param configuracao Configuração da aplicação.
- * @returns Nada.
- */
-function validarConfiguracao(configuracao: ConfiguracaoApp): void {
-    const problemas: string[] = ValidarConfiguracao(configuracao);
-
-    if (!problemas.length)
-        return;
-
-    throw new ErroGitLab(CodigoErroGitLab.ConfiguracaoInvalida, "O backend ainda não está configurado para acessar o GitLab.", StatusHttp.ErroInterno, problemas.join(" "));
 }
 
 /**
