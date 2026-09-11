@@ -1,14 +1,20 @@
 import { OutgoingHttpHeaders } from "http";
-import { ConfiguracaoApp } from "../../configuracao/types";
-import { ErroGitLab } from "./ErroGitLab";
-import { ExecutarGet, RespostaHttp } from "./RequisicaoGitLab";
+import { ConfiguracaoApp, LIMITE } from "../../configuracao/types";
+import { DiscussaoNormalizada } from "../../logica/types";
+import { EscopoMergeRequest, MergeRequestAberto, MergeRequestResumo, PaginaArquivosAlterados } from "../../models/Revisao/types";
 import { StatusHttp } from "../../utilidades/types";
+import { ClienteRevisao } from "../ClienteRevisao";
+import { CodigoErroProvedor, ErroProvedor } from "../ErroProvedor";
+import { ExecutarGet, RespostaHttp } from "../http/ExecutarGet";
+import { PaginaResultado } from "../types";
+import { ConverterArquivoAlterado, ConverterMergeRequest, ConverterMergeRequestAberto, NormalizarDiscussoes } from "./ConversorGitLab";
 import {
     API_GITLAB,
     CabecalhoGitLab,
-    CodigoErroGitLab,
+    CampoDePesquisaGitLab,
     DefinicaoErroHttp,
     CommitGitLab,
+    DiffArquivoGitLab,
     DiscussaoGitLab,
     EscopoGitLab,
     EstadoIssueGitLab,
@@ -20,13 +26,18 @@ import {
     MergeRequestRelacionadoGitLab,
     NotaGitLab,
     ORDEM_NOTAS,
-    PaginaGitLab,
     TipoItemArvoreGitLab,
     UsuarioGitLab,
 } from "./types";
 
+/** Escopo da API do GitLab correspondente a cada escopo exibido na tela. */
+const ESCOPO_GITLAB: Record<EscopoMergeRequest, EscopoGitLab> = {
+    [EscopoMergeRequest.CriadosPorMim]: EscopoGitLab.CriadosPorMim,
+    [EscopoMergeRequest.AtribuidosAMim]: EscopoGitLab.AtribuidosAMim,
+};
+
 /** Cliente somente leitura da API v4 do GitLab. */
-export class ClienteGitLab {
+export class ClienteGitLab implements ClienteRevisao {
     private readonly urlBaseApi: string;
     private readonly configuracao: ConfiguracaoApp;
 
@@ -35,31 +46,127 @@ export class ClienteGitLab {
      */
     constructor(configuracao: ConfiguracaoApp) {
         this.configuracao = configuracao;
-        this.urlBaseApi = `${configuracao.urlGitLab}${API_GITLAB.CAMINHO_BASE}`;
+        this.urlBaseApi = configuracao.urlBase + API_GITLAB.CAMINHO_BASE;
     }
 
     /**
      * Busca os dados principais de um Merge Request.
      * @param projetoId ID numérico ou caminho do projeto.
      * @param mrIid IID do Merge Request.
-     * @returns Merge Request encontrado.
+     * @returns Merge Request no formato de domínio.
      */
-    public async GetMergeRequest(projetoId: string, mrIid: string): Promise<MergeRequestGitLab> {
-        return this.getJson<MergeRequestGitLab>(`/projects/${encodeURIComponent(projetoId)}/merge_requests/${encodeURIComponent(mrIid)}`);
+    public async GetMergeRequest(projetoId: string, mrIid: string): Promise<MergeRequestResumo> {
+        const mergeRequest: MergeRequestGitLab = await this.getJson<MergeRequestGitLab>(`/projects/${encodeURIComponent(projetoId)}/merge_requests/${encodeURIComponent(mrIid)}`);
+
+        return ConverterMergeRequest(mergeRequest);
     }
 
     /**
      * Lista os Merge Requests abertos do usuário dono do token, em todos os projetos que ele enxerga.
      * @param escopo Se a lista traz os Merge Requests criados por ele ou os atribuídos a ele.
-     * @returns Merge Requests encontrados, do mais recente para o mais antigo.
+     * @returns Merge Requests já no formato de domínio, do mais recente para o mais antigo.
      */
-    public async GetMergeRequestsAbertos(escopo: EscopoGitLab): Promise<PaginaGitLab<MergeRequestListaGitLab>> {
-        return this.getTodasPaginas<MergeRequestListaGitLab>("/merge_requests", {
-            scope: escopo,
+    public async GetMergeRequestsAbertos(escopo: EscopoMergeRequest): Promise<PaginaResultado<MergeRequestAberto>> {
+        const pagina: PaginaResultado<MergeRequestListaGitLab> = await this.getTodasPaginas<MergeRequestListaGitLab>("/merge_requests", {
+            scope: ESCOPO_GITLAB[escopo],
             state: EstadoMergeRequestGitLab.Aberto,
             order_by: "updated_at",
             sort: "desc",
         });
+
+        return { itens: pagina.itens.map(ConverterMergeRequestAberto), truncada: pagina.truncada };
+    }
+
+    /**
+     * Pesquisa Merge Requests abertos pelo título, em todos os projetos que o token enxerga.
+     * @param termo Texto pesquisado no título.
+     * @returns Merge Requests encontrados, já no formato de domínio, do mais recente para o mais antigo.
+     */
+    public async BuscarMergeRequests(termo: string): Promise<PaginaResultado<MergeRequestAberto>> {
+        const pagina: PaginaResultado<MergeRequestListaGitLab> = await this.getTodasPaginas<MergeRequestListaGitLab>("/merge_requests", {
+            scope: EscopoGitLab.Todos,
+            state: EstadoMergeRequestGitLab.Aberto,
+            search: termo,
+            in: CampoDePesquisaGitLab.Titulo,
+            order_by: "updated_at",
+            sort: "desc",
+        });
+
+        return { itens: pagina.itens.map(ConverterMergeRequestAberto), truncada: pagina.truncada };
+    }
+
+    /**
+     * Busca todas as threads de comentários de um Merge Request, já normalizadas.
+     *
+     * O Merge Request é buscado junto porque a nota do GitLab não traz link próprio: o permalink
+     * de cada comentário é a URL do Merge Request mais o fragmento #note_<id>.
+     * @param projetoId ID numérico ou caminho do projeto.
+     * @param mrIid IID do Merge Request.
+     * @returns Threads normalizadas e indicação de paginação truncada.
+     */
+    public async GetDiscussoes(projetoId: string, mrIid: string): Promise<PaginaResultado<DiscussaoNormalizada>> {
+        const [mergeRequest, pagina] = await Promise.all([
+            this.GetMergeRequest(projetoId, mrIid),
+            this.getTodasPaginas<DiscussaoGitLab>(`/projects/${encodeURIComponent(projetoId)}/merge_requests/${encodeURIComponent(mrIid)}/discussions`),
+        ]);
+
+        return { itens: NormalizarDiscussoes(pagina.itens, this.configuracao.autoresIgnorados, mergeRequest.url), truncada: pagina.truncada };
+    }
+
+    /**
+     * Busca o conteúdo de um arquivo do repositório em um commit específico.
+     *
+     * O conteúdo é buscado por blob, em duas etapas: localiza o id do arquivo na árvore do
+     * commit e então lê esse blob. O endpoint /repository/files/:caminho/raw não é usado
+     * porque responde 404 para arquivos existentes em parte das instâncias do GitLab.
+     * @param projetoId ID numérico ou caminho do projeto.
+     * @param caminhoArquivo Caminho do arquivo dentro do repositório.
+     * @param ref Commit, branch ou tag usada como referência.
+     * @returns Conteúdo do arquivo em texto.
+     */
+    public async GetArquivoBruto(projetoId: string, caminhoArquivo: string, ref: string): Promise<string> {
+        const idDoBlob: string = await this.getIdDoBlob(projetoId, caminhoArquivo, ref);
+        const caminho = `/projects/${encodeURIComponent(projetoId)}/repository/blobs/${encodeURIComponent(idDoBlob)}/raw`;
+        const resposta: RespostaHttp = await this.executar(caminho, {}, "*/*");
+
+        if (resposta.corpo.length > this.configuracao.tamanhoMaxArquivoBytes)
+            throw new ErroProvedor(CodigoErroProvedor.ArquivoMuitoGrande, "O arquivo é grande demais para ser exibido aqui.", StatusHttp.ConteudoMuitoGrande);
+
+        if (resposta.corpo.includes(0))
+            throw new ErroProvedor(CodigoErroProvedor.ArquivoBinario, "O arquivo é binário e não tem trecho de código para mostrar.", StatusHttp.TipoNaoSuportado);
+
+        return resposta.corpo.toString("utf8");
+    }
+
+    /**
+     * Busca uma página dos arquivos alterados de um Merge Request.
+     *
+     * Diferente de getTodasPaginas, esta chamada é feita uma única vez: é o próprio frontend quem
+     * pede a próxima página (botão "carregar mais"), para nunca buscar de uma vez um Merge Request
+     * com centenas de arquivos.
+     * @param projetoId ID numérico ou caminho do projeto.
+     * @param mrIid IID do Merge Request.
+     * @param pagina Página desejada, a partir de 1.
+     * @returns Arquivos da página, a próxima página (se houver) e o total de arquivos.
+     */
+    public async GetArquivosAlterados(projetoId: string, mrIid: string, pagina: number): Promise<PaginaArquivosAlterados> {
+        const resposta: RespostaHttp = await this.executar(`/projects/${encodeURIComponent(projetoId)}/merge_requests/${encodeURIComponent(mrIid)}/diffs`, {
+            per_page: LIMITE.ARQUIVOS_ALTERADOS_POR_PAGINA,
+            page: pagina,
+        });
+        const conteudo: unknown = converterJson(resposta);
+
+        if (!Array.isArray(conteudo))
+            throw new ErroProvedor(CodigoErroProvedor.RespostaInesperada, "O GitLab devolveu uma resposta em formato inesperado.", StatusHttp.GatewayInvalido);
+
+        const proximaPagina: number = Number.parseInt(String(resposta.cabecalhos[CabecalhoGitLab.ProximaPagina] ?? ""), 10);
+        const total: number = Number.parseInt(String(resposta.cabecalhos[CabecalhoGitLab.Total] ?? ""), 10);
+
+        return {
+            itens: (conteudo as DiffArquivoGitLab[]).map((arquivo) => ConverterArquivoAlterado(arquivo, LIMITE.MAX_LINHAS_DIFF_POR_ARQUIVO)),
+            proximaPagina: Number.isFinite(proximaPagina) && proximaPagina > 0 ? proximaPagina : null,
+            totalArquivos: Number.isFinite(total) ? total : null,
+        };
     }
 
     /**
@@ -77,7 +184,7 @@ export class ClienteGitLab {
      * @param atualizadasApos Data ISO a partir da qual as issues interessam.
      * @returns Issues encontradas e indicação de paginação truncada.
      */
-    public async GetIssuesAtribuidas(atualizadasApos: string): Promise<PaginaGitLab<IssueGitLab>> {
+    public async GetIssuesAtribuidas(atualizadasApos: string): Promise<PaginaResultado<IssueGitLab>> {
         return this.getTodasPaginas<IssueGitLab>("/issues", {
             scope: EscopoGitLab.AtribuidosAMim,
             state: EstadoIssueGitLab.Todas,
@@ -94,7 +201,7 @@ export class ClienteGitLab {
      * @param issueIid IID da issue.
      * @returns Notas encontradas e indicação de paginação truncada.
      */
-    public async GetNotasIssue(projetoId: number, issueIid: number): Promise<PaginaGitLab<NotaGitLab>> {
+    public async GetNotasIssue(projetoId: number, issueIid: number): Promise<PaginaResultado<NotaGitLab>> {
         return this.getTodasPaginas<NotaGitLab>(`/projects/${projetoId}/issues/${issueIid}/notes`, {
             order_by: ORDEM_NOTAS.CAMPO,
             sort: ORDEM_NOTAS.SENTIDO,
@@ -109,7 +216,7 @@ export class ClienteGitLab {
      * @param issueIid IID da issue.
      * @returns Merge Requests relacionados e indicação de paginação truncada.
      */
-    public async GetMergeRequestsRelacionados(projetoId: number, issueIid: number): Promise<PaginaGitLab<MergeRequestRelacionadoGitLab>> {
+    public async GetMergeRequestsRelacionados(projetoId: number, issueIid: number): Promise<PaginaResultado<MergeRequestRelacionadoGitLab>> {
         return this.getTodasPaginas<MergeRequestRelacionadoGitLab>(`/projects/${projetoId}/issues/${issueIid}/related_merge_requests`);
     }
 
@@ -122,7 +229,7 @@ export class ClienteGitLab {
      * @param desde Instante ISO a partir do qual os commits interessam.
      * @returns Commits dentro da janela e indicação de paginação truncada.
      */
-    public async GetCommitsRecentes(projetoId: number, mrIid: number, desde: string): Promise<PaginaGitLab<CommitGitLab>> {
+    public async GetCommitsRecentes(projetoId: number, mrIid: number, desde: string): Promise<PaginaResultado<CommitGitLab>> {
         const limiteDeTempo: number = new Date(desde).getTime();
         const itens: CommitGitLab[] = [];
         let pagina = 1;
@@ -132,7 +239,7 @@ export class ClienteGitLab {
             const conteudo: unknown = converterJson(resposta);
 
             if (!Array.isArray(conteudo))
-                throw new ErroGitLab(CodigoErroGitLab.RespostaInesperada, "O GitLab devolveu uma resposta em formato inesperado.", StatusHttp.GatewayInvalido);
+                throw new ErroProvedor(CodigoErroProvedor.RespostaInesperada, "O GitLab devolveu uma resposta em formato inesperado.", StatusHttp.GatewayInvalido);
 
             const commits: CommitGitLab[] = conteudo as CommitGitLab[];
             itens.push(...commits);
@@ -157,41 +264,6 @@ export class ClienteGitLab {
     }
 
     /**
-     * Busca todas as threads de comentários de um Merge Request.
-     * @param projetoId ID numérico ou caminho do projeto.
-     * @param mrIid IID do Merge Request.
-     * @returns Threads encontradas e indicação de paginação truncada.
-     */
-    public async GetDiscussoes(projetoId: string, mrIid: string): Promise<PaginaGitLab<DiscussaoGitLab>> {
-        return this.getTodasPaginas<DiscussaoGitLab>(`/projects/${encodeURIComponent(projetoId)}/merge_requests/${encodeURIComponent(mrIid)}/discussions`);
-    }
-
-    /**
-     * Busca o conteúdo de um arquivo do repositório em um commit específico.
-     *
-     * O conteúdo é buscado por blob, em duas etapas: localiza o id do arquivo na árvore do
-     * commit e então lê esse blob. O endpoint /repository/files/:caminho/raw não é usado
-     * porque responde 404 para arquivos existentes em parte das instâncias do GitLab.
-     * @param projetoId ID numérico ou caminho do projeto.
-     * @param caminhoArquivo Caminho do arquivo dentro do repositório.
-     * @param ref Commit, branch ou tag usada como referência.
-     * @returns Conteúdo do arquivo em texto.
-     */
-    public async GetArquivoBruto(projetoId: string, caminhoArquivo: string, ref: string): Promise<string> {
-        const idDoBlob: string = await this.getIdDoBlob(projetoId, caminhoArquivo, ref);
-        const caminho = `/projects/${encodeURIComponent(projetoId)}/repository/blobs/${encodeURIComponent(idDoBlob)}/raw`;
-        const resposta: RespostaHttp = await this.executar(caminho, {}, "*/*");
-
-        if (resposta.corpo.length > this.configuracao.tamanhoMaxArquivoBytes)
-            throw new ErroGitLab(CodigoErroGitLab.ArquivoMuitoGrande, "O arquivo é grande demais para ser exibido aqui.", StatusHttp.ConteudoMuitoGrande);
-
-        if (resposta.corpo.includes(0))
-            throw new ErroGitLab(CodigoErroGitLab.ArquivoBinario, "O arquivo é binário e não tem trecho de código para mostrar.", StatusHttp.TipoNaoSuportado);
-
-        return resposta.corpo.toString("utf8");
-    }
-
-    /**
      * Acha o id do blob de um arquivo, percorrendo a árvore do repositório na pasta dele.
      * @param projetoId ID numérico ou caminho do projeto.
      * @param caminhoArquivo Caminho do arquivo dentro do repositório.
@@ -205,7 +277,7 @@ export class ClienteGitLab {
         const item: ItemArvoreGitLab | undefined = itens.find((candidato) => candidato.path === caminhoArquivo && candidato.type === TipoItemArvoreGitLab.Arquivo);
 
         if (!item)
-            throw new ErroGitLab(CodigoErroGitLab.NaoEncontrado, `O arquivo "${caminhoArquivo}" não foi encontrado neste commit.`, StatusHttp.NaoEncontrado);
+            throw new ErroProvedor(CodigoErroProvedor.NaoEncontrado, `O arquivo "${caminhoArquivo}" não foi encontrado neste commit.`, StatusHttp.NaoEncontrado);
 
         return item.id;
     }
@@ -260,7 +332,7 @@ export class ClienteGitLab {
      * @param parametros Filtros aplicados à listagem.
      * @returns Itens de todas as páginas lidas e se a leitura foi interrompida pelo limite.
      */
-    private async getTodasPaginas<T>(caminho: string, parametros: Record<string, string | number> = {}): Promise<PaginaGitLab<T>> {
+    private async getTodasPaginas<T>(caminho: string, parametros: Record<string, string | number> = {}): Promise<PaginaResultado<T>> {
         const itens: T[] = [];
         let pagina = 1;
 
@@ -269,7 +341,7 @@ export class ClienteGitLab {
             const conteudo: unknown = converterJson(resposta);
 
             if (!Array.isArray(conteudo))
-                throw new ErroGitLab(CodigoErroGitLab.RespostaInesperada, "O GitLab devolveu uma resposta em formato inesperado.", StatusHttp.GatewayInvalido);
+                throw new ErroProvedor(CodigoErroProvedor.RespostaInesperada, "O GitLab devolveu uma resposta em formato inesperado.", StatusHttp.GatewayInvalido);
 
             itens.push(...(conteudo as T[]));
 
@@ -306,7 +378,7 @@ function converterJson(resposta: RespostaHttp): unknown {
     try {
         return JSON.parse(resposta.corpo.toString("utf8"));
     } catch {
-        throw new ErroGitLab(CodigoErroGitLab.RespostaInesperada, "O GitLab devolveu uma resposta em formato inesperado.", StatusHttp.GatewayInvalido, "Confirme se a variável GITLAB_URL aponta para o endereço da instância do GitLab.");
+        throw new ErroProvedor(CodigoErroProvedor.RespostaInesperada, "O GitLab devolveu uma resposta em formato inesperado.", StatusHttp.GatewayInvalido, "Confirme se a variável GITLAB_URL aponta para o endereço da instância do GitLab.");
     }
 }
 
@@ -334,25 +406,25 @@ function lerMensagemDoGitLab(corpo: Buffer): string {
 /** Erro correspondente a cada status HTTP que o GitLab costuma devolver. */
 const ERRO_POR_STATUS: Partial<Record<StatusHttp, DefinicaoErroHttp>> = {
     [StatusHttp.NaoAutorizado]: {
-        codigo: CodigoErroGitLab.TokenInvalido,
+        codigo: CodigoErroProvedor.TokenInvalido,
         mensagem: "O token informado é inválido ou está expirado.",
         status: StatusHttp.NaoAutorizado,
         dica: "Gere um novo Personal Access Token com o escopo read_api e atualize o arquivo .env.",
     },
     [StatusHttp.Proibido]: {
-        codigo: CodigoErroGitLab.AcessoNegado,
+        codigo: CodigoErroProvedor.AcessoNegado,
         mensagem: "Seu usuário não tem acesso a este recurso.",
         status: StatusHttp.Proibido,
         dica: "Confirme se o token tem o escopo read_api e se você enxerga esse projeto no GitLab.",
     },
     [StatusHttp.NaoEncontrado]: {
-        codigo: CodigoErroGitLab.NaoEncontrado,
+        codigo: CodigoErroProvedor.NaoEncontrado,
         mensagem: "O projeto ou o Merge Request informado não foi encontrado.",
         status: StatusHttp.NaoEncontrado,
         dica: "Confira o Project ID e o IID. O GitLab também responde assim quando o token não tem acesso ao projeto.",
     },
     [StatusHttp.MuitasRequisicoes]: {
-        codigo: CodigoErroGitLab.LimiteRequisicoes,
+        codigo: CodigoErroProvedor.LimiteRequisicoes,
         mensagem: "O GitLab recusou a consulta por excesso de requisições.",
         status: StatusHttp.MuitasRequisicoes,
         dica: "Aguarde alguns segundos ou aumente o intervalo de atualização automática.",
@@ -364,18 +436,18 @@ const ERRO_POR_STATUS: Partial<Record<StatusHttp, DefinicaoErroHttp>> = {
  * @param resposta Resposta devolvida pelo GitLab.
  * @returns Erro com mensagem e orientação para o usuário.
  */
-function converterStatusEmErro(resposta: RespostaHttp): ErroGitLab {
+function converterStatusEmErro(resposta: RespostaHttp): ErroProvedor {
     const detalhe: string = lerMensagemDoGitLab(resposta.corpo);
     const complemento: string = detalhe ? ` Resposta do GitLab: ${detalhe}.` : "";
     const definicao: DefinicaoErroHttp | undefined = ERRO_POR_STATUS[resposta.status as StatusHttp];
 
     if (definicao)
-        return new ErroGitLab(definicao.codigo, `${definicao.mensagem}${complemento}`, definicao.status, definicao.dica);
+        return new ErroProvedor(definicao.codigo, `${definicao.mensagem}${complemento}`, definicao.status, definicao.dica);
 
     if (resposta.status >= StatusHttp.ErroInterno)
-        return new ErroGitLab(CodigoErroGitLab.ErroServidorGitLab, `O servidor do GitLab respondeu com erro.${complemento}`, StatusHttp.GatewayInvalido, "Tente novamente em alguns instantes.");
+        return new ErroProvedor(CodigoErroProvedor.ErroServidorProvedor, `O servidor do GitLab respondeu com erro.${complemento}`, StatusHttp.GatewayInvalido, "Tente novamente em alguns instantes.");
 
-    return new ErroGitLab(CodigoErroGitLab.RespostaInesperada, `O GitLab respondeu de forma inesperada.${complemento}`, StatusHttp.GatewayInvalido);
+    return new ErroProvedor(CodigoErroProvedor.RespostaInesperada, `O GitLab respondeu de forma inesperada.${complemento}`, StatusHttp.GatewayInvalido);
 }
 
 /**

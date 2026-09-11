@@ -23,16 +23,6 @@ export interface DiaDeHoras {
     porIssue: HorasPorIssueNoDia[];
 }
 
-/**
- * Nível de confiança de que as horas lançadas na issue correspondem a trabalho de verdade,
- * conforme o dono do token tenha ou não commitado nela. Do menos para o mais forte.
- */
-export enum NivelElegibilidade {
-    SemCommit = "sem_commit",
-    CommitouNaSemana = "commitou_na_semana",
-    CommitouHoje = "commitou_hoje",
-}
-
 /** Issue do usuário com as horas que ele lançou na semana consultada. */
 export interface IssueComHoras {
     projetoId: string;
@@ -44,7 +34,12 @@ export interface IssueComHoras {
     atualizadoEm: string;
     horasNaSemana: number;
     horasTotais: number;
-    elegibilidade: NivelElegibilidade;
+    /**
+     * Dias (dentro da semana consultada) em que o dono do token commitou nesta issue — a tela
+     * decide o marcador (hoje/semana) a partir daqui, conforme o dia que o usuário escolher como
+     * referência no gráfico, então o backend não pode reduzir isso a um nível fixo de antemão.
+     */
+    diasComCommit: string[];
 }
 
 /**

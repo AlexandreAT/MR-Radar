@@ -67,7 +67,7 @@ export const Vazio = styled.div`
     text-align: center;
 `;
 
-/** Link para uma página do GitLab. */
+/** Link para uma página do provedor. */
 export const LinkExterno = styled.a`
     font-size: 13px;
     font-weight: 600;

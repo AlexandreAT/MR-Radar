@@ -1,3 +1,4 @@
+import { Toaster } from "sonner";
 import { ThemeProvider } from "styled-components";
 import { PainelHoras } from "src/components/Horas/PainelHoras";
 import { CabecalhoApp } from "src/components/Layout/CabecalhoApp";
@@ -13,6 +14,20 @@ export function App() {
     return (
         <ThemeProvider theme={tema}>
             <GlobalStyle />
+            <Toaster
+                theme="dark"
+                position="bottom-right"
+                toastOptions={{
+                    style: {
+                        background: tema.cores.fundoPainel,
+                        border: `1px solid ${tema.cores.borda}`,
+                        borderRadius: tema.raioBorda,
+                        color: tema.cores.texto,
+                        fontFamily: tema.fontes.padrao,
+                        fontSize: "13px",
+                    },
+                }}
+            />
             <CabecalhoApp pagina={pagina} configuracao={configuracao} erroConfiguracao={erroConfiguracao} onAlterarPagina={handleAlterarPagina} />
             {pagina === PaginaApp.Horas ? <PainelHoras configuracao={configuracao} /> : <PainelRevisao configuracao={configuracao} />}
         </ThemeProvider>

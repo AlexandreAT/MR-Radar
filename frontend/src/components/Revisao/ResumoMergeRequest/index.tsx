@@ -1,12 +1,17 @@
 import { Etiqueta } from "src/components/BasicComponents";
-import { BotaoContador, Branches, Contadores, Container, Detalhes, Informacao, LinkExterno, Titulo } from "./styles";
+import { ModalAlteracoes } from "src/components/Revisao/ModalAlteracoes";
+import { BotaoAbrirModal, BotaoContador, Branches, Contadores, Container, Detalhes, Informacao, Titulo } from "./styles";
 import { CONTADORES, PropriedadesResumoMergeRequest, TEXTO_RESUMO } from "./types";
+import { useResumoMergeRequest } from "./useResumoMergeRequest";
 
-export function ResumoMergeRequest({ mergeRequest, contagem, situacao, onAlterarSituacao }: PropriedadesResumoMergeRequest) {
+export function ResumoMergeRequest({ projetoId, vocabulario, mergeRequest, contagem, situacao, onAlterarSituacao }: PropriedadesResumoMergeRequest) {
+    const { modalAberto, handleAbrirModal, handleFecharModal } = useResumoMergeRequest();
+
     return (
         <Container>
             <Titulo>
-                !{mergeRequest.iid} {TEXTO_RESUMO.SEPARADOR} {mergeRequest.titulo}
+                {vocabulario.prefixoReferencia}
+                {mergeRequest.iid} {TEXTO_RESUMO.SEPARADOR} {mergeRequest.titulo}
             </Titulo>
             <Detalhes>
                 <Informacao>{mergeRequest.autor.nome}</Informacao>
@@ -24,9 +29,11 @@ export function ResumoMergeRequest({ mergeRequest, contagem, situacao, onAlterar
                     </BotaoContador>
                 ))}
             </Contadores>
-            <LinkExterno href={mergeRequest.url} target="_blank" rel="noreferrer">
-                {TEXTO_RESUMO.LINK_GITLAB}
-            </LinkExterno>
+            <BotaoAbrirModal type="button" onClick={handleAbrirModal}>
+                Abrir o {vocabulario.nomeItem}
+            </BotaoAbrirModal>
+
+            {modalAberto && <ModalAlteracoes projetoId={projetoId} mergeRequest={mergeRequest} vocabulario={vocabulario} onFechar={handleFecharModal} />}
         </Container>
     );
 }

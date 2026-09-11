@@ -1,7 +1,18 @@
 import styled from "styled-components";
 import { PainelBase } from "../../sharedStyles";
 
-export { LinkExterno } from "../../sharedStyles";
+export const BotaoAbrirModal = styled.button`
+    all: unset;
+    align-self: flex-start;
+    cursor: pointer;
+    color: ${({ theme }) => theme.cores.primaria};
+    font-size: 13px;
+    font-weight: 600;
+
+    &:hover {
+        text-decoration: underline;
+    }
+`;
 
 export const Container = styled(PainelBase)`
     display: flex;

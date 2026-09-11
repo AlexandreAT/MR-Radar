@@ -66,4 +66,8 @@ export interface LinhaReferencia {
 export interface PropriedadesGraficoHoras {
     horasPorDia: DiaDeHoras[];
     horasPorDiaEsperadas: number;
+    /** Dia (AAAA-MM-DD) clicado no gráfico, usado como referência na lista de chamados abaixo. */
+    diaSelecionado: string | null;
+    /** Chamado quando o usuário clica numa barra, para marcar aquele dia como referência. */
+    onSelecionarDia: (data: string) => void;
 }

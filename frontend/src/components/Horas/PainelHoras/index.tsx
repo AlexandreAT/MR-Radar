@@ -23,7 +23,20 @@ import { PropriedadesPainelHoras, TEXTO_HORAS } from "./types";
 import { usePainelHoras } from "./usePainelHoras";
 
 export function PainelHoras({ configuracao }: PropriedadesPainelHoras) {
-    const { resumo, carregando, erro, mensagemVazio, periodo, handleSemanaAnterior, handleSemanaSeguinte, handleAtualizar } = usePainelHoras(configuracao);
+    const {
+        resumo,
+        carregando,
+        erro,
+        mensagemVazio,
+        periodo,
+        diaSelecionado,
+        diaReferencia,
+        ehDiaReferenciaHoje,
+        handleSemanaAnterior,
+        handleSemanaSeguinte,
+        handleSelecionarDia,
+        handleAtualizar,
+    } = usePainelHoras(configuracao);
 
     return (
         <Pagina>
@@ -76,7 +89,12 @@ export function PainelHoras({ configuracao }: PropriedadesPainelHoras) {
                         )}
                     </Resumo>
 
-                    <GraficoHoras horasPorDia={resumo.horasPorDia} horasPorDiaEsperadas={resumo.horasPorDiaEsperadas} />
+                    <GraficoHoras
+                        horasPorDia={resumo.horasPorDia}
+                        horasPorDiaEsperadas={resumo.horasPorDiaEsperadas}
+                        diaSelecionado={diaSelecionado}
+                        onSelecionarDia={handleSelecionarDia}
+                    />
                 </Painel>
             )}
 
@@ -88,7 +106,7 @@ export function PainelHoras({ configuracao }: PropriedadesPainelHoras) {
 
             {!resumo && !erro && <Vazio>{mensagemVazio}</Vazio>}
 
-            {resumo && <ListaIssuesHoras issues={resumo.issues} />}
+            {resumo && <ListaIssuesHoras issues={resumo.issues} diaReferencia={diaReferencia} ehHoje={ehDiaReferenciaHoje} />}
         </Pagina>
     );
 }

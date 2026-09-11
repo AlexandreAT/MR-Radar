@@ -1,3 +1,9 @@
+/** Provedor de código com o qual o dashboard conversa. */
+export enum Provedor {
+    GitLab = "gitlab",
+    GitHub = "github",
+}
+
 /** Filtro de status aplicado às threads de comentários. */
 export enum StatusFiltro {
     Abertos = "abertos",
@@ -33,6 +39,7 @@ export enum CodigoErroTrecho {
     ArquivoMuitoGrande = "ARQUIVO_MUITO_GRANDE",
     LinhaForaDoArquivo = "LINHA_FORA_DO_ARQUIVO",
     FalhaAoBuscar = "FALHA_AO_BUSCAR",
+    SemPermissao = "SEM_PERMISSAO",
 }
 
 /** Autor de um comentário ou de um Merge Request. */
@@ -124,6 +131,8 @@ export interface RevisaoMergeRequest {
     comentarios: ComentarioRevisao[];
     consultadoEm: string;
     paginacaoTruncada: boolean;
+    /** Avisos não fatais (ex.: status de resolução indisponível por falta de permissão do token). */
+    avisos?: string[];
 }
 
 /** De quem são os Merge Requests listados na tela. */
@@ -156,6 +165,18 @@ export interface ListaMergeRequestsAbertos {
     paginacaoTruncada: boolean;
 }
 
+/**
+ * Resposta da pesquisa de Merge Requests por título.
+ * Não é limitada a criados ou atribuídos ao dono do token: traz qualquer Merge Request aberto que
+ * o token enxergue, para achar o MR de outra pessoa sem saber o projeto e o número de cor.
+ */
+export interface ResultadoPesquisaMergeRequests {
+    termo: string;
+    mergeRequests: MergeRequestAberto[];
+    consultadoEm: string;
+    paginacaoTruncada: boolean;
+}
+
 /** Parâmetros aceitos na consulta de comentários. */
 export interface ParametrosConsultaRevisao {
     projetoId: string;
@@ -166,9 +187,55 @@ export interface ParametrosConsultaRevisao {
 
 /** Dados de configuração que o frontend precisa conhecer. */
 export interface ConfiguracaoDashboard {
-    urlGitLab: string;
+    provedor: Provedor;
+    urlProvedor: string;
     tokenConfigurado: boolean;
     linhasContexto: number;
     somenteLeitura: boolean;
     problemas: string[];
+}
+
+/** O que aconteceu com o arquivo entre a branch de destino e a de origem do Merge Request. */
+export enum StatusArquivoAlterado {
+    Adicionado = "adicionado",
+    Removido = "removido",
+    Modificado = "modificado",
+    Renomeado = "renomeado",
+}
+
+/** Papel de uma linha dentro do diff de um arquivo. */
+export enum TipoLinhaDiff {
+    Contexto = "contexto",
+    Adicionada = "adicionada",
+    Removida = "removida",
+}
+
+/** Uma linha do diff, com a numeração de cada lado quando ela existe naquele lado. */
+export interface LinhaDiff {
+    tipo: TipoLinhaDiff;
+    numeroAntigo: number | null;
+    numeroNovo: number | null;
+    texto: string;
+}
+
+/**
+ * Um arquivo alterado no Merge Request, já com o diff recortado nos mesmos blocos que o GitLab e o
+ * GitHub mostram (linha alterada mais um pouco de contexto ao redor, nunca o arquivo inteiro).
+ */
+export interface ArquivoAlterado {
+    caminho: string;
+    caminhoAntigo: string | null;
+    status: StatusArquivoAlterado;
+    linguagem: string;
+    linhas: LinhaDiff[] | null;
+    motivoIndisponivel: string | null;
+    adicoes: number | null;
+    remocoes: number | null;
+}
+
+/** Uma página de arquivos alterados de um Merge Request. */
+export interface PaginaArquivosAlterados {
+    itens: ArquivoAlterado[];
+    proximaPagina: number | null;
+    totalArquivos: number | null;
 }

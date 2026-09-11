@@ -3,6 +3,7 @@ import { Atualizacao, Caixa, Container, GrupoBotoes, GrupoMarcacoes, Marcacao } 
 import { LARGURA_CAMPO, OPCOES_INTERVALO, OPCOES_STATUS, PropriedadesFiltroRevisao, TEXTO_FILTRO } from "./types";
 
 export function FiltroRevisao({
+    vocabulario,
     projetoId,
     mrIid,
     status,
@@ -21,19 +22,19 @@ export function FiltroRevisao({
     return (
         <Container>
             <CampoTexto
-                rotulo={TEXTO_FILTRO.ROTULO_PROJETO}
+                rotulo={vocabulario.rotuloProjeto}
                 valor={projetoId}
                 onChange={onAlterarProjeto}
                 onEnter={onBuscar}
-                placeholder={TEXTO_FILTRO.PLACEHOLDER_PROJETO}
+                placeholder={vocabulario.placeholderProjeto}
                 largura={LARGURA_CAMPO.PROJETO}
             />
             <CampoTexto
-                rotulo={TEXTO_FILTRO.ROTULO_MR}
+                rotulo={vocabulario.rotuloNumero}
                 valor={mrIid}
                 onChange={onAlterarMrIid}
                 onEnter={onBuscar}
-                placeholder={TEXTO_FILTRO.PLACEHOLDER_MR}
+                placeholder={vocabulario.placeholderNumero}
                 largura={LARGURA_CAMPO.MERGE_REQUEST}
             />
             <CampoSelecao

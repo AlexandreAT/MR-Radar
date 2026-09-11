@@ -7,7 +7,12 @@ export const Container = styled(PainelBase)`
     gap: ${({ theme }) => theme.espacamentos.medio};
 `;
 
-export const Cabecalho = styled.header`
+export const Titulo = styled.h2`
+    margin: 0;
+    font-size: 15px;
+`;
+
+export const LinhaControles = styled.div`
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
@@ -15,13 +20,15 @@ export const Cabecalho = styled.header`
     gap: ${({ theme }) => theme.espacamentos.medio};
 `;
 
-export const Titulo = styled.h2`
-    margin: 0;
-    font-size: 15px;
-`;
-
 export const Acoes = styled.div`
     display: flex;
+    align-items: flex-end;
+    gap: ${({ theme }) => theme.espacamentos.pequeno};
+`;
+
+export const LinhaPesquisa = styled.div`
+    display: flex;
+    flex-wrap: wrap;
     align-items: flex-end;
     gap: ${({ theme }) => theme.espacamentos.pequeno};
 `;

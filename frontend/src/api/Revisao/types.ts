@@ -1,3 +1,9 @@
+/** Provedor de código com o qual o dashboard conversa. */
+export enum Provedor {
+    GitLab = "gitlab",
+    GitHub = "github",
+}
+
 /** Filtro de status aplicado às threads de comentários. */
 export enum StatusFiltro {
     Abertos = "abertos",
@@ -59,8 +65,21 @@ export interface TrechoCodigo {
 }
 
 /** Motivo pelo qual não foi possível exibir o trecho de código. */
+export enum CodigoErroTrecho {
+    SemPosicao = "SEM_POSICAO",
+    SemLinha = "SEM_LINHA",
+    RefIndisponivel = "REF_INDISPONIVEL",
+    ArquivoNaoEncontrado = "ARQUIVO_NAO_ENCONTRADO",
+    ArquivoBinario = "ARQUIVO_BINARIO",
+    ArquivoMuitoGrande = "ARQUIVO_MUITO_GRANDE",
+    LinhaForaDoArquivo = "LINHA_FORA_DO_ARQUIVO",
+    FalhaAoBuscar = "FALHA_AO_BUSCAR",
+    SemPermissao = "SEM_PERMISSAO",
+}
+
+/** Motivo pelo qual não foi possível exibir o trecho de código. */
 export interface ErroTrecho {
-    codigo: string;
+    codigo: CodigoErroTrecho;
     mensagem: string;
 }
 
@@ -121,11 +140,14 @@ export interface RevisaoMergeRequest {
     comentarios: ComentarioRevisao[];
     consultadoEm: string;
     paginacaoTruncada: boolean;
+    /** Avisos não fatais (ex.: status de resolução indisponível por falta de permissão do token). */
+    avisos?: string[];
 }
 
 /** Configuração que o backend expõe para a tela. */
 export interface ConfiguracaoDashboard {
-    urlGitLab: string;
+    provedor: Provedor;
+    urlProvedor: string;
     tokenConfigurado: boolean;
     linhasContexto: number;
     somenteLeitura: boolean;
@@ -167,4 +189,54 @@ export interface ParametrosBuscaRevisao {
     projetoId: string;
     mrIid: string;
     status: StatusFiltro;
+}
+
+/** O que aconteceu com o arquivo entre a branch de destino e a de origem do Merge Request. */
+export enum StatusArquivoAlterado {
+    Adicionado = "adicionado",
+    Removido = "removido",
+    Modificado = "modificado",
+    Renomeado = "renomeado",
+}
+
+/** Papel de uma linha dentro do diff de um arquivo. */
+export enum TipoLinhaDiff {
+    Contexto = "contexto",
+    Adicionada = "adicionada",
+    Removida = "removida",
+}
+
+/** Uma linha do diff, com a numeração de cada lado quando ela existe naquele lado. */
+export interface LinhaDiff {
+    tipo: TipoLinhaDiff;
+    numeroAntigo: number | null;
+    numeroNovo: number | null;
+    texto: string;
+}
+
+/** Um arquivo alterado no Merge Request, com o diff já recortado nos mesmos blocos do provedor. */
+export interface ArquivoAlterado {
+    caminho: string;
+    caminhoAntigo: string | null;
+    status: StatusArquivoAlterado;
+    linguagem: string;
+    linhas: LinhaDiff[] | null;
+    motivoIndisponivel: string | null;
+    adicoes: number | null;
+    remocoes: number | null;
+}
+
+/** Uma página de arquivos alterados de um Merge Request. */
+export interface PaginaArquivosAlterados {
+    itens: ArquivoAlterado[];
+    proximaPagina: number | null;
+    totalArquivos: number | null;
+}
+
+/** Resposta da pesquisa de Merge Requests por título. */
+export interface ResultadoPesquisaMergeRequests {
+    termo: string;
+    mergeRequests: MergeRequestAberto[];
+    consultadoEm: string;
+    paginacaoTruncada: boolean;
 }

@@ -1,4 +1,5 @@
 import { StatusFiltro } from "src/api/Revisao/types";
+import { Vocabulario } from "src/utils/Vocabulario";
 import { OpcaoSelecao } from "src/components/BasicComponents";
 
 /** Opções do filtro de status. */
@@ -24,12 +25,8 @@ export const LARGURA_CAMPO = {
 
 /** Textos fixos exibidos no filtro. */
 export const TEXTO_FILTRO = {
-    ROTULO_PROJETO: "Project ID ou caminho",
-    ROTULO_MR: "IID do Merge Request",
     ROTULO_STATUS: "Status",
     ROTULO_INTERVALO: "Intervalo",
-    PLACEHOLDER_PROJETO: "123 ou grupo/projeto",
-    PLACEHOLDER_MR: "456",
     BUSCAR: "Buscar",
     ATUALIZAR: "Atualizar agora",
     BUSCANDO: "Buscando...",
@@ -39,6 +36,7 @@ export const TEXTO_FILTRO = {
 
 /** Propriedades aceitas pelo filtro de revisão. */
 export interface PropriedadesFiltroRevisao {
+    vocabulario: Vocabulario;
     projetoId: string;
     mrIid: string;
     status: StatusFiltro;

@@ -1,5 +1,5 @@
-import { DiscussaoGitLab, IssueGitLab, NotaGitLab } from "../integracao/gitlab/types";
-import { ErroTrecho, LadoDiff, TrechoCodigo } from "../models/Revisao/types";
+import { IssueGitLab } from "../integracao/gitlab/types";
+import { Autor, ErroTrecho, LadoDiff, TrechoCodigo } from "../models/Revisao/types";
 
 /** Posição de um comentário já interpretada, pronta para buscar o arquivo. */
 export interface PosicaoResolvida {
@@ -10,12 +10,6 @@ export interface PosicaoResolvida {
     refs: string[];
 }
 
-/** Primeira e última linha que devem aparecer destacadas no trecho. */
-export interface IntervaloDestaque {
-    inicial: number | null;
-    final: number | null;
-}
-
 /** Resultado da tentativa de montar o trecho de código de um comentário. */
 export interface ResultadoTrecho {
     codigo: string | null;
@@ -23,11 +17,21 @@ export interface ResultadoTrecho {
     erroTrecho: ErroTrecho | null;
 }
 
-/** Thread do GitLab com os dados já interpretados que o dashboard utiliza. */
+/** Nota de uma thread já convertida para o domínio, independente do provedor de origem. */
+export interface NotaNormalizada {
+    id: number;
+    url: string;
+    autor: Autor;
+    corpo: string;
+    criadoEm: string;
+    atualizadoEm: string;
+}
+
+/** Thread de revisão já interpretada, independente do provedor de origem. */
 export interface DiscussaoNormalizada {
-    discussao: DiscussaoGitLab;
-    notaPrincipal: NotaGitLab;
-    respostas: NotaGitLab[];
+    id: string;
+    notaPrincipal: NotaNormalizada;
+    respostas: NotaNormalizada[];
     resolvivel: boolean;
     resolvido: boolean;
     posicao: PosicaoResolvida;

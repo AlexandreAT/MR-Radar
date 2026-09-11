@@ -1,8 +1,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GetComentariosRevisao, GetMeusMergeRequests } from "src/api/Revisao";
-import { ComentarioRevisao, ConfiguracaoDashboard, EscopoMergeRequest, ListaMergeRequestsAbertos, MergeRequestAberto, RevisaoMergeRequest, StatusFiltro } from "src/api/Revisao/types";
+import { BuscarMergeRequests, GetComentariosRevisao, GetMeusMergeRequests } from "src/api/Revisao";
+import {
+    CodigoErroBackend,
+    CodigoErroTrecho,
+    ComentarioRevisao,
+    ConfiguracaoDashboard,
+    EscopoMergeRequest,
+    ListaMergeRequestsAbertos,
+    MergeRequestAberto,
+    RevisaoMergeRequest,
+    StatusFiltro,
+} from "src/api/Revisao/types";
 import { ConverterErro, EhCancelamento } from "src/services";
 import { CODIGO_ERRO_COMUNICACAO, MensagemErro } from "src/services/types";
+import { AvisarAvisos, AvisarSeProblemaDeToken } from "src/utils/AvisoToken";
 import { FormatarComentariosParaCopia } from "src/utils/ComentariosParaCopia";
 import {
     EscopoCobreSituacao,
@@ -16,7 +27,19 @@ import {
 import { FormatarHora } from "src/utils/Formatacao";
 import { ExtrairDadosDaUrl } from "src/utils/MergeRequestUrl";
 import { ChavePreferencia, GetPreferencia, SalvarPreferencia } from "src/utils/Preferencias";
-import { CODIGOS_ERRO_PERMANENTE, EstadoCopia, INTERVALO_PADRAO_SEGUNDOS, MENSAGEM, MILISSEGUNDOS_POR_SEGUNDO, OpcoesBusca, TEMPO_RETORNO_COPIA_MS } from "./types";
+import { GetVocabulario, Vocabulario } from "src/utils/Vocabulario";
+import {
+    CODIGOS_ERRO_PERMANENTE,
+    EstadoCopia,
+    GetMensagensDoProvedor,
+    INTERVALO_PADRAO_SEGUNDOS,
+    MENSAGEM,
+    MensagensDoProvedor,
+    MILISSEGUNDOS_POR_SEGUNDO,
+    OpcoesBusca,
+    TEMPO_RETORNO_COPIA_MS,
+    TERMO_PESQUISA_MIN_CARACTERES,
+} from "./types";
 
 /**
  * Concentra o estado e as consultas da tela de revisão.
@@ -33,6 +56,9 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
     const [atualizacaoAutomatica, setAtualizacaoAutomatica] = useState<boolean>(false);
     const [intervaloSegundos, setIntervaloSegundos] = useState<number>(INTERVALO_PADRAO_SEGUNDOS);
     const [revisao, setRevisao] = useState<RevisaoMergeRequest | null>(null);
+    // Guardado junto com o revisao (não é o mesmo que o projetoId do campo, que o usuário pode
+    // editar sem clicar em Buscar): é o projeto que realmente carregou o Merge Request na tela.
+    const [projetoIdCarregado, setProjetoIdCarregado] = useState<string>("");
     const [carregando, setCarregando] = useState<boolean>(false);
     const [erro, setErro] = useState<MensagemErro | null>(null);
     const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string>("");
@@ -44,12 +70,23 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
     const [carregandoLista, setCarregandoLista] = useState<boolean>(false);
     const [erroLista, setErroLista] = useState<MensagemErro | null>(null);
 
+    // resultadosPesquisa nulo é "sem pesquisa ativa": a lista mostrada volta a ser a de escopo.
+    const [termoPesquisa, setTermoPesquisa] = useState<string>("");
+    const [resultadosPesquisa, setResultadosPesquisa] = useState<MergeRequestAberto[] | null>(null);
+    const [pesquisaTruncada, setPesquisaTruncada] = useState<boolean>(false);
+    const [pesquisando, setPesquisando] = useState<boolean>(false);
+    const [erroPesquisa, setErroPesquisa] = useState<MensagemErro | null>(null);
+
     const requisicaoEmAndamento = useRef<AbortController | null>(null);
     const requisicaoDaLista = useRef<AbortController | null>(null);
+    const requisicaoDaPesquisa = useRef<AbortController | null>(null);
     const temporizadorCopia = useRef<number | null>(null);
 
     const podeBuscar: boolean = useMemo(() => Boolean(projetoId.trim() && mrIid.trim()), [projetoId, mrIid]);
+    const podePesquisar: boolean = useMemo(() => termoPesquisa.trim().length >= TERMO_PESQUISA_MIN_CARACTERES, [termoPesquisa]);
     const configuracaoValida: boolean = Boolean(configuracao && configuracao.problemas.length === 0);
+    const vocabulario: Vocabulario = GetVocabulario(configuracao?.provedor);
+    const mensagens: MensagensDoProvedor = GetMensagensDoProvedor(vocabulario);
 
     // A lista exibida é sempre a que sobrou dos filtros da tela, na ordem escolhida.
     const comentarios: ComentarioRevisao[] = useMemo(
@@ -65,6 +102,7 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
         () => () => {
             requisicaoEmAndamento.current?.abort();
             requisicaoDaLista.current?.abort();
+            requisicaoDaPesquisa.current?.abort();
 
             if (temporizadorCopia.current)
                 window.clearTimeout(temporizadorCopia.current);
@@ -92,8 +130,11 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
             if (EhCancelamento(falha))
                 return;
 
+            const mensagemErro: MensagemErro = ConverterErro(falha, mensagens.ERRO_LISTA);
+
             setMeusMergeRequests([]);
-            setErroLista(ConverterErro(falha, MENSAGEM.ERRO_LISTA));
+            setErroLista(mensagemErro);
+            AvisarSeProblemaDeToken(mensagemErro, "Lista de Merge Requests");
         } finally {
             if (requisicaoDaLista.current === controlador) {
                 requisicaoDaLista.current = null;
@@ -114,7 +155,7 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
             const silenciosa: boolean = opcoes.silenciosa ?? false;
 
             if (!projeto || !iid) {
-                setErro({ codigo: CODIGO_ERRO_COMUNICACAO, mensagem: MENSAGEM.CAMPOS_OBRIGATORIOS, dica: "" });
+                setErro({ codigo: CODIGO_ERRO_COMUNICACAO, mensagem: mensagens.CAMPOS_OBRIGATORIOS, dica: "" });
                 return;
             }
 
@@ -134,8 +175,15 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
                 const dados: RevisaoMergeRequest = await GetComentariosRevisao({ projetoId: projeto, mrIid: iid, status: statusBusca }, controlador.signal);
 
                 setRevisao(dados);
+                setProjetoIdCarregado(projeto);
                 setErro(null);
                 setUltimaAtualizacao(FormatarHora(new Date()));
+                AvisarAvisos(dados.avisos);
+
+                // Todos os comentários sem permissão de ler o trecho vêm do mesmo motivo (o token
+                // não tem o acesso necessário) — um só aviso, não um por comentário.
+                if (dados.comentarios.some((comentario) => comentario.erroTrecho?.codigo === CodigoErroTrecho.SemPermissao))
+                    AvisarSeProblemaDeToken({ codigo: CodigoErroBackend.AcessoNegado, mensagem: MENSAGEM.ERRO_TRECHO_SEM_PERMISSAO, dica: "" }, "Trecho de código");
             } catch (falha: unknown) {
                 if (EhCancelamento(falha))
                     return;
@@ -179,6 +227,7 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
     function tratarFalha(falha: unknown, silenciosa: boolean): void {
         const mensagemErro: MensagemErro = ConverterErro(falha, MENSAGEM.ERRO_INESPERADO);
         setErro(mensagemErro);
+        AvisarSeProblemaDeToken(mensagemErro, "Comentários");
 
         // Numa busca manual o resultado antigo é de outro Merge Request ou de outro filtro,
         // então sai da tela. Numa atualização automática ele é mantido, porque a falha pode ser passageira.
@@ -291,6 +340,60 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
     }
 
     /**
+     * Atualiza o termo pesquisado. Esvaziar o campo volta a mostrar a lista por escopo na hora,
+     * sem precisar de um botão de limpar à parte.
+     * @param valor Texto digitado no campo de pesquisa.
+     * @returns Nada.
+     */
+    function handleAlterarTermoPesquisa(valor: string): void {
+        setTermoPesquisa(valor);
+
+        if (!valor.trim()) {
+            requisicaoDaPesquisa.current?.abort();
+            setResultadosPesquisa(null);
+            setErroPesquisa(null);
+        }
+    }
+
+    /**
+     * Pesquisa Merge Requests pelo título, entre todos os que o token enxerga.
+     * @returns Nada.
+     */
+    async function handlePesquisar(): Promise<void> {
+        const termo: string = termoPesquisa.trim();
+
+        if (termo.length < TERMO_PESQUISA_MIN_CARACTERES)
+            return;
+
+        requisicaoDaPesquisa.current?.abort();
+        const controlador = new AbortController();
+        requisicaoDaPesquisa.current = controlador;
+        setPesquisando(true);
+
+        try {
+            const resultado = await BuscarMergeRequests(termo, controlador.signal);
+
+            setResultadosPesquisa(resultado.mergeRequests);
+            setPesquisaTruncada(resultado.paginacaoTruncada);
+            setErroPesquisa(null);
+        } catch (falha: unknown) {
+            if (EhCancelamento(falha))
+                return;
+
+            const mensagemErro: MensagemErro = ConverterErro(falha, MENSAGEM.ERRO_PESQUISA);
+
+            setResultadosPesquisa(null);
+            setErroPesquisa(mensagemErro);
+            AvisarSeProblemaDeToken(mensagemErro, "Pesquisa de Merge Requests");
+        } finally {
+            if (requisicaoDaPesquisa.current === controlador) {
+                requisicaoDaPesquisa.current = null;
+                setPesquisando(false);
+            }
+        }
+    }
+
+    /**
      * Dispara a consulta a partir dos botões e da tecla Enter.
      * @returns Nada.
      */
@@ -304,7 +407,7 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
      */
     async function handleCopiarComentarios(): Promise<void> {
         try {
-            await navigator.clipboard.writeText(FormatarComentariosParaCopia(comentarios));
+            await navigator.clipboard.writeText(FormatarComentariosParaCopia(comentarios, vocabulario.nomeItem));
             setEstadoCopia(EstadoCopia.Copiado);
         } catch {
             setEstadoCopia(EstadoCopia.Falhou);
@@ -317,7 +420,10 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
     }
 
     return {
+        vocabulario,
+        mensagens,
         projetoId,
+        projetoIdCarregado,
         mrIid,
         status,
         situacao,
@@ -338,6 +444,12 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
         listaTruncada,
         carregandoLista,
         erroLista,
+        termoPesquisa,
+        podePesquisar,
+        resultadosPesquisa,
+        pesquisaTruncada,
+        pesquisando,
+        erroPesquisa,
         handleAlterarProjeto,
         handleAlterarStatus,
         handleAlterarSituacao,
@@ -345,6 +457,8 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
         handleAlterarIntervalo,
         handleAlterarEscopo,
         handleAtualizarLista,
+        handleAlterarTermoPesquisa,
+        handlePesquisar,
         handleSelecionarMergeRequest,
         handleBuscar,
         handleCopiarComentarios,

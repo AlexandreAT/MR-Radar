@@ -20,7 +20,7 @@ import {
 import { DESENHO, PropriedadesGraficoHoras, TEXTO_GRAFICO } from "./types";
 import { useGraficoHoras } from "./useGraficoHoras";
 
-export function GraficoHoras({ horasPorDia, horasPorDiaEsperadas }: PropriedadesGraficoHoras) {
+export function GraficoHoras({ horasPorDia, horasPorDiaEsperadas, diaSelecionado, onSelecionarDia }: PropriedadesGraficoHoras) {
     const { barras, referencia, descricao, barraEmFoco, handleFoco, handleDesfoco } = useGraficoHoras(horasPorDia, horasPorDiaEsperadas);
 
     return (
@@ -29,6 +29,7 @@ export function GraficoHoras({ horasPorDia, horasPorDiaEsperadas }: Propriedades
                 {barras.map((barra, indice) => (
                     <Trilho
                         key={barra.data}
+                        $selecionada={barra.data === diaSelecionado}
                         x={barra.x}
                         y={DESENHO.TOPO_AREA}
                         width={DESENHO.LARGURA_BARRA}
@@ -36,6 +37,7 @@ export function GraficoHoras({ horasPorDia, horasPorDiaEsperadas }: Propriedades
                         rx={DESENHO.RAIO_BARRA}
                         onMouseEnter={() => handleFoco(indice)}
                         onMouseLeave={handleDesfoco}
+                        onClick={() => onSelecionarDia(barra.data)}
                     />
                 ))}
 

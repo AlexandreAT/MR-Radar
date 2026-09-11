@@ -1,23 +1,10 @@
-/** Códigos de erro devolvidos pela integração com o GitLab. */
-export enum CodigoErroGitLab {
-    ConfiguracaoInvalida = "CONFIGURACAO_INVALIDA",
-    ParametroInvalido = "PARAMETRO_INVALIDO",
-    TokenInvalido = "TOKEN_INVALIDO",
-    AcessoNegado = "ACESSO_NEGADO",
-    NaoEncontrado = "NAO_ENCONTRADO",
-    LimiteRequisicoes = "LIMITE_REQUISICOES",
-    ErroServidorGitLab = "ERRO_SERVIDOR_GITLAB",
-    RespostaInesperada = "RESPOSTA_INESPERADA",
-    FalhaRede = "FALHA_REDE",
-    TempoEsgotado = "TEMPO_ESGOTADO",
-    ArquivoMuitoGrande = "ARQUIVO_MUITO_GRANDE",
-    ArquivoBinario = "ARQUIVO_BINARIO",
-}
+import { CodigoErroProvedor } from "../ErroProvedor";
 
 /** Cabeçalhos usados nas chamadas à API do GitLab. */
 export enum CabecalhoGitLab {
     Token = "PRIVATE-TOKEN",
     ProximaPagina = "x-next-page",
+    Total = "x-total",
     TentarApos = "retry-after",
     ReinicioLimite = "ratelimit-reset",
 }
@@ -26,6 +13,13 @@ export enum CabecalhoGitLab {
 export enum EscopoGitLab {
     CriadosPorMim = "created_by_me",
     AtribuidosAMim = "assigned_to_me",
+    /** Não filtra por autor/atribuído: traz qualquer Merge Request que o token enxergue. */
+    Todos = "all",
+}
+
+/** Campo em que a pesquisa por texto procura o termo. */
+export enum CampoDePesquisaGitLab {
+    Titulo = "title",
 }
 
 /** Situação de issue usada nas consultas. */
@@ -56,8 +50,6 @@ export const API_GITLAB = {
     CAMINHO_BASE: "/api/v4",
     ITENS_POR_PAGINA: 100,
     MAX_TENTATIVAS_LIMITE: 2,
-    MAX_REDIRECIONAMENTOS: 3,
-    TAMANHO_MAX_RESPOSTA_BYTES: 8 * 1024 * 1024,
     ESPERA_MAX_MS: 15000,
     ESPERA_BASE_MS: 1000,
     MAX_CARACTERES_MENSAGEM_ERRO: 300,
@@ -67,7 +59,7 @@ export const API_GITLAB = {
 
 /** Erro pronto para cada status HTTP conhecido devolvido pelo GitLab. */
 export interface DefinicaoErroHttp {
-    codigo: CodigoErroGitLab;
+    codigo: CodigoErroProvedor;
     mensagem: string;
     status: number;
     dica: string;
@@ -229,8 +221,20 @@ export interface ItemArvoreGitLab {
     path: string;
 }
 
-/** Resultado de uma consulta paginada à API. */
-export interface PaginaGitLab<T> {
-    itens: T[];
-    truncada: boolean;
+/**
+ * Diff de um único arquivo dentro do Merge Request.
+ *
+ * "diff" vem vazio tanto quando too_large é verdadeiro quanto em alguns arquivos com collapsed
+ * verdadeiro e too_large falso (confirmado contra a API real) — por isso o sinal de "diff
+ * indisponível" usado pelo conversor é o próprio campo vazio, não um dos dois booleanos isolado.
+ */
+export interface DiffArquivoGitLab {
+    diff: string;
+    collapsed: boolean;
+    too_large: boolean;
+    new_path: string;
+    old_path: string;
+    new_file: boolean;
+    renamed_file: boolean;
+    deleted_file: boolean;
 }

@@ -9,12 +9,12 @@ import {
     Conteudo,
     DicaErro,
     Direita,
-    EnderecoGitLab,
+    EnderecoProvedor,
     TextoAviso,
     TextoErro,
     Titulo,
 } from "./styles";
-import { ABAS, PropriedadesCabecalhoApp, TEXTO_CABECALHO } from "./types";
+import { GetAbas, PropriedadesCabecalhoApp, TEXTO_CABECALHO } from "./types";
 
 export function CabecalhoApp({ pagina, configuracao, erroConfiguracao, onAlterarPagina }: PropriedadesCabecalhoApp) {
     return (
@@ -22,7 +22,7 @@ export function CabecalhoApp({ pagina, configuracao, erroConfiguracao, onAlterar
             <Conteudo>
                 <Titulo>{TEXTO_CABECALHO.TITULO}</Titulo>
                 <Abas>
-                    {ABAS.map((aba) => (
+                    {GetAbas(configuracao?.provedor).map((aba) => (
                         <Aba
                             key={aba.pagina}
                             type="button"
@@ -35,7 +35,7 @@ export function CabecalhoApp({ pagina, configuracao, erroConfiguracao, onAlterar
                     ))}
                 </Abas>
                 <Direita>
-                    {configuracao?.urlGitLab && <EnderecoGitLab>{configuracao.urlGitLab}</EnderecoGitLab>}
+                    {configuracao?.urlProvedor && <EnderecoProvedor>{configuracao.urlProvedor}</EnderecoProvedor>}
                     <Etiqueta tom={TomEtiqueta.Resolvido}>{TEXTO_CABECALHO.ETIQUETA_SOMENTE_LEITURA}</Etiqueta>
                 </Direita>
             </Conteudo>

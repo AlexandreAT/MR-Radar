@@ -22,8 +22,8 @@ import {
 import { PropriedadesCartaoComentario, TEXTO_CARTAO } from "./types";
 import { useCartaoComentario } from "./useCartaoComentario";
 
-export function CartaoComentario({ comentario }: PropriedadesCartaoComentario) {
-    const { situacao, rotulo, dataFormatada, local, temRespostas } = useCartaoComentario(comentario);
+export function CartaoComentario({ comentario, vocabulario }: PropriedadesCartaoComentario) {
+    const { situacao, rotulo, dataFormatada, local, textoLink, temRespostas } = useCartaoComentario(comentario, vocabulario);
 
     return (
         <Cartao>
@@ -75,7 +75,7 @@ export function CartaoComentario({ comentario }: PropriedadesCartaoComentario) {
 
             <Rodape>
                 <LinkExterno href={comentario.url} target="_blank" rel="noreferrer">
-                    {TEXTO_CARTAO.LINK_GITLAB}
+                    {textoLink}
                 </LinkExterno>
             </Rodape>
         </Cartao>

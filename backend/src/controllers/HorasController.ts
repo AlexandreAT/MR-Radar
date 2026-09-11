@@ -1,8 +1,7 @@
 import { Request, Response, Router } from "express";
 import { GarantirConfiguracaoValida } from "../configuracao/Configuracao";
 import { ConfiguracaoApp } from "../configuracao/types";
-import { ErroGitLab } from "../integracao/gitlab/ErroGitLab";
-import { CodigoErroGitLab } from "../integracao/gitlab/types";
+import { CodigoErroProvedor, ErroProvedor } from "../integracao/ErroProvedor";
 import { LogicaHoras } from "../logica/LogicaHoras";
 import { ResumoHorasSemana } from "../models/Horas/types";
 import { Envolver } from "../utilidades/Assincrono";
@@ -49,7 +48,7 @@ function lerSemana(requisicao: Request): string {
         return "";
 
     if (!DATA_ISO_VALIDA.test(valor))
-        throw new ErroGitLab(CodigoErroGitLab.ParametroInvalido, "A semana informada não é uma data válida.", StatusHttp.RequisicaoInvalida, "Informe uma data no formato AAAA-MM-DD.");
+        throw new ErroProvedor(CodigoErroProvedor.ParametroInvalido, "A semana informada não é uma data válida.", StatusHttp.RequisicaoInvalida, "Informe uma data no formato AAAA-MM-DD.");
 
     return valor;
 }

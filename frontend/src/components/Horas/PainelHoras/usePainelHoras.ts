@@ -4,6 +4,8 @@ import { ResumoHorasSemana } from "src/api/Horas/types";
 import { ConfiguracaoDashboard } from "src/api/Revisao/types";
 import { ConverterErro, EhCancelamento } from "src/services";
 import { MensagemErro } from "src/services/types";
+import { AvisarSeProblemaDeToken } from "src/utils/AvisoToken";
+import { GetDataDeHojeLocal } from "src/utils/Elegibilidade";
 import { FormatarDiaMes } from "src/utils/Formatacao";
 import { TEXTO_HORAS } from "./types";
 
@@ -30,6 +32,8 @@ export function usePainelHoras(configuracao: ConfiguracaoDashboard | null) {
     const [resumo, setResumo] = useState<ResumoHorasSemana | null>(null);
     const [carregando, setCarregando] = useState<boolean>(false);
     const [erro, setErro] = useState<MensagemErro | null>(null);
+    // Nulo significa "sem dia clicado": o dia de referência do marcador verde é hoje, por padrão.
+    const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
 
     const requisicaoEmAndamento = useRef<AbortController | null>(null);
     const configuracaoValida: boolean = Boolean(configuracao && configuracao.problemas.length === 0);
@@ -53,7 +57,10 @@ export function usePainelHoras(configuracao: ConfiguracaoDashboard | null) {
             if (EhCancelamento(falha))
                 return;
 
-            setErro(ConverterErro(falha, TEXTO_HORAS.ERRO));
+            const mensagemErro: MensagemErro = ConverterErro(falha, TEXTO_HORAS.ERRO);
+
+            setErro(mensagemErro);
+            AvisarSeProblemaDeToken(mensagemErro, "Horas");
         } finally {
             if (requisicaoEmAndamento.current === controlador) {
                 requisicaoEmAndamento.current = null;
@@ -73,8 +80,10 @@ export function usePainelHoras(configuracao: ConfiguracaoDashboard | null) {
      * @returns Nada.
      */
     function handleSemanaAnterior(): void {
-        if (resumo)
+        if (resumo) {
             setSemana(resumo.semanaAnterior);
+            setDiaSelecionado(null);
+        }
     }
 
     /**
@@ -82,9 +91,23 @@ export function usePainelHoras(configuracao: ConfiguracaoDashboard | null) {
      * @returns Nada.
      */
     function handleSemanaSeguinte(): void {
-        if (resumo && !resumo.ehSemanaAtual)
+        if (resumo && !resumo.ehSemanaAtual) {
             setSemana(resumo.semanaSeguinte);
+            setDiaSelecionado(null);
+        }
     }
+
+    /**
+     * Marca um dia do gráfico como referência para o marcador verde da lista de chamados. Clicar
+     * no mesmo dia já selecionado desmarca, voltando a usar hoje como referência.
+     * @param data Dia clicado no gráfico (AAAA-MM-DD).
+     * @returns Nada.
+     */
+    function handleSelecionarDia(data: string): void {
+        setDiaSelecionado((atual) => (atual === data ? null : data));
+    }
+
+    const diaReferencia: string = diaSelecionado ?? GetDataDeHojeLocal();
 
     return {
         resumo,
@@ -92,8 +115,12 @@ export function usePainelHoras(configuracao: ConfiguracaoDashboard | null) {
         erro,
         mensagemVazio: getMensagemVazio(carregando, configuracaoValida),
         periodo: resumo ? `${FormatarDiaMes(resumo.inicioSemana)} ${TEXTO_HORAS.ATE} ${FormatarDiaMes(resumo.fimSemana)}` : "",
+        diaSelecionado,
+        diaReferencia,
+        ehDiaReferenciaHoje: diaSelecionado === null,
         handleSemanaAnterior,
         handleSemanaSeguinte,
+        handleSelecionarDia,
         handleAtualizar: buscar,
     };
 }

@@ -10,7 +10,10 @@ import { usePainelRevisao } from "./usePainelRevisao";
 
 export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
     const {
+        vocabulario,
+        mensagens,
         projetoId,
+        projetoIdCarregado,
         mrIid,
         status,
         situacao,
@@ -31,6 +34,12 @@ export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
         listaTruncada,
         carregandoLista,
         erroLista,
+        termoPesquisa,
+        podePesquisar,
+        resultadosPesquisa,
+        pesquisaTruncada,
+        pesquisando,
+        erroPesquisa,
         handleAlterarProjeto,
         handleAlterarStatus,
         handleAlterarSituacao,
@@ -38,6 +47,8 @@ export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
         handleAlterarIntervalo,
         handleAlterarEscopo,
         handleAtualizarLista,
+        handleAlterarTermoPesquisa,
+        handlePesquisar,
         handleSelecionarMergeRequest,
         handleBuscar,
         handleCopiarComentarios,
@@ -56,18 +67,28 @@ export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
             )}
 
             <ListaMergeRequests
+                vocabulario={vocabulario}
                 mergeRequests={meusMergeRequests}
                 escopo={escopo}
                 carregando={carregandoLista}
                 paginacaoTruncada={listaTruncada}
                 projetoSelecionado={projetoId}
                 mrSelecionado={mrIid}
+                termoPesquisa={termoPesquisa}
+                podePesquisar={podePesquisar}
+                resultadosPesquisa={resultadosPesquisa}
+                pesquisaTruncada={pesquisaTruncada}
+                pesquisando={pesquisando}
+                erroPesquisa={erroPesquisa?.mensagem ?? null}
                 onAlterarEscopo={handleAlterarEscopo}
                 onSelecionar={handleSelecionarMergeRequest}
                 onAtualizar={handleAtualizarLista}
+                onAlterarTermoPesquisa={handleAlterarTermoPesquisa}
+                onPesquisar={handlePesquisar}
             />
 
             <FiltroRevisao
+                vocabulario={vocabulario}
                 projetoId={projetoId}
                 mrIid={mrIid}
                 status={status}
@@ -94,6 +115,8 @@ export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
             {revisao && (
                 <>
                     <ResumoMergeRequest
+                        projetoId={projetoIdCarregado}
+                        vocabulario={vocabulario}
                         mergeRequest={revisao.mergeRequest}
                         contagem={revisao.contagem}
                         situacao={situacao}
@@ -122,13 +145,13 @@ export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
                 </CaixaAviso>
             )}
 
-            {!revisao && !erro && <Vazio>{MENSAGEM.SEM_BUSCA}</Vazio>}
+            {!revisao && !erro && <Vazio>{mensagens.SEM_BUSCA}</Vazio>}
 
             {revisao && comentarios.length === 0 && <Vazio>{MENSAGEM.SEM_COMENTARIOS}</Vazio>}
 
             <Lista>
                 {comentarios.map((comentario) => (
-                    <CartaoComentario key={comentario.id} comentario={comentario} />
+                    <CartaoComentario key={comentario.id} comentario={comentario} vocabulario={vocabulario} />
                 ))}
             </Lista>
         </Pagina>

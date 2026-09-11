@@ -5,7 +5,7 @@ import react from "@vitejs/plugin-react";
 /** Porta em que o frontend é servido durante o desenvolvimento. */
 const PORTA_FRONTEND = 5173;
 
-/** Endereço do backend local que conversa com o GitLab. */
+/** Endereço do backend local que conversa com o provedor. */
 const URL_BACKEND = "http://127.0.0.1:3001";
 
 export default defineConfig({

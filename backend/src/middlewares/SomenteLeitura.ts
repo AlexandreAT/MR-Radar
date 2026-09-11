@@ -1,5 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { CodigoErroGitLab } from "../integracao/gitlab/types";
+import { CodigoErroProvedor } from "../integracao/ErroProvedor";
 import { StatusHttp } from "../utilidades/types";
 
 /** Métodos HTTP aceitos pelo backend, que é somente leitura. */
@@ -10,6 +10,11 @@ const ORIGEM_LOCAL = /^http:\/\/(localhost|127\.0\.0\.1|mr-radar\.local)(:\d+)?$
 
 /**
  * Bloqueia qualquer método que não seja de leitura.
+ *
+ * Este middleware protege o que ENTRA no backend: nenhum POST vindo do navegador é aceito. Ele
+ * não tem relação com o que o backend envia PARA FORA — esse outro perímetro é somente GET por
+ * construção (integracao/http/ExecutarGet.ts), com uma única exceção declarada e isolada em
+ * integracao/github/ExecutarGraphQLStatusResolucao.ts.
  * @param requisicao Requisição recebida.
  * @param resposta Resposta em construção.
  * @param proximo Próximo middleware da cadeia.
@@ -23,9 +28,9 @@ export function SomenteLeitura(requisicao: Request, resposta: Response, proximo:
 
     resposta.status(StatusHttp.MetodoNaoPermitido).json({
         erro: {
-            codigo: CodigoErroGitLab.ParametroInvalido,
+            codigo: CodigoErroProvedor.ParametroInvalido,
             mensagem: "Este dashboard é somente leitura e aceita apenas consultas.",
-            dica: "Nenhuma alteração pode ser feita no GitLab por aqui.",
+            dica: "Nenhuma alteração pode ser feita no provedor por aqui.",
         },
     });
 }

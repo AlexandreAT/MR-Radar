@@ -1,6 +1,5 @@
 import { NextFunction, Request, Response } from "express";
-import { ErroGitLab } from "../integracao/gitlab/ErroGitLab";
-import { CodigoErroGitLab } from "../integracao/gitlab/types";
+import { CodigoErroProvedor, ErroProvedor } from "../integracao/ErroProvedor";
 import { StatusHttp } from "../utilidades/types";
 
 /**
@@ -12,7 +11,7 @@ import { StatusHttp } from "../utilidades/types";
 export function RotaNaoEncontrada(requisicao: Request, resposta: Response): void {
     resposta.status(StatusHttp.NaoEncontrado).json({
         erro: {
-            codigo: CodigoErroGitLab.NaoEncontrado,
+            codigo: CodigoErroProvedor.NaoEncontrado,
             mensagem: `O endereço ${requisicao.originalUrl} não existe neste backend.`,
             dica: "",
         },
@@ -28,7 +27,7 @@ export function RotaNaoEncontrada(requisicao: Request, resposta: Response): void
  * @returns Nada.
  */
 export function TratadorDeErros(erro: unknown, _requisicao: Request, resposta: Response, _proximo: NextFunction): void {
-    if (erro instanceof ErroGitLab) {
+    if (erro instanceof ErroProvedor) {
         resposta.status(erro.statusHttp).json({ erro: { codigo: erro.codigo, mensagem: erro.message, dica: erro.dica } });
         return;
     }
@@ -38,8 +37,8 @@ export function TratadorDeErros(erro: unknown, _requisicao: Request, resposta: R
 
     resposta.status(StatusHttp.ErroInterno).json({
         erro: {
-            codigo: CodigoErroGitLab.RespostaInesperada,
-            mensagem: "Ocorreu um erro inesperado ao consultar o GitLab.",
+            codigo: CodigoErroProvedor.RespostaInesperada,
+            mensagem: "Ocorreu um erro inesperado ao consultar o provedor.",
             dica: mensagem,
         },
     });

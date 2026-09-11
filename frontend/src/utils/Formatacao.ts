@@ -14,8 +14,8 @@ const FORMATADOR_HORA = new Intl.DateTimeFormat("pt-BR", {
     second: "2-digit",
 });
 
-/** Formato usado para exibir uma quantidade de horas. */
-const FORMATADOR_HORAS = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 2 });
+/** Minutos em uma hora, usados para converter horas fracionadas em horas e minutos. */
+const MINUTOS_POR_HORA = 60;
 
 /** Marca de rastreamento de ticket que alguns títulos trazem no começo, entre colchetes. */
 const TAG_TICKET = /^\[ticket[^\]]*\]\s*/i;
@@ -50,11 +50,12 @@ export function FormatarHora(data: Date): string {
  * Monta o texto que indica onde o comentário foi feito.
  * @param caminhoArquivo Caminho do arquivo no repositório.
  * @param linha Linha comentada.
+ * @param nomeItem Como o provedor ativo chama o item (Merge Request ou Pull Request).
  * @returns Arquivo com a linha, apenas o arquivo, ou o aviso de comentário geral.
  */
-export function FormatarLocal(caminhoArquivo: string | null, linha: number | null): string {
+export function FormatarLocal(caminhoArquivo: string | null, linha: number | null, nomeItem: string): string {
     if (!caminhoArquivo)
-        return "Comentário geral do Merge Request";
+        return `Comentário geral do ${nomeItem}`;
 
     return linha ? `${caminhoArquivo}:${linha}` : caminhoArquivo;
 }
@@ -72,12 +73,16 @@ export function FormatarDiaMes(data: string): string {
 }
 
 /**
- * Formata uma quantidade de horas para exibição.
- * @param horas Quantidade de horas.
- * @returns Horas com no máximo duas casas decimais e o sufixo "h".
+ * Formata uma quantidade de horas para exibição no formato de relógio (ex.: 4:30h em vez de 4,5h).
+ * @param horas Quantidade de horas, podendo ter fração (ex.: 4.5).
+ * @returns Horas e minutos separados por ":", com o sufixo "h".
  */
 export function FormatarHoras(horas: number): string {
-    return FORMATADOR_HORAS.format(horas) + "h";
+    const totalMinutos: number = Math.round(horas * MINUTOS_POR_HORA);
+    const horasInteiras: number = Math.floor(totalMinutos / MINUTOS_POR_HORA);
+    const minutos: number = totalMinutos % MINUTOS_POR_HORA;
+
+    return `${horasInteiras}:${String(minutos).padStart(2, "0")}h`;
 }
 
 /**

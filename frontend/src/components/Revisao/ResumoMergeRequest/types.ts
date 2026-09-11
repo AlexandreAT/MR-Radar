@@ -1,9 +1,12 @@
 import { ContagemComentarios, MergeRequestResumo } from "src/api/Revisao/types";
+import { Vocabulario } from "src/utils/Vocabulario";
 import { TomEtiqueta } from "src/components/BasicComponents";
 import { SituacaoComentario } from "src/utils/ComentariosRevisao";
 
 /** Propriedades aceitas pelo resumo do Merge Request. */
 export interface PropriedadesResumoMergeRequest {
+    projetoId: string;
+    vocabulario: Vocabulario;
     mergeRequest: MergeRequestResumo;
     contagem: ContagemComentarios;
     situacao: SituacaoComentario | null;
@@ -28,7 +31,6 @@ export const CONTADORES: ContadorResumo[] = [
 
 /** Textos fixos exibidos no resumo. */
 export const TEXTO_RESUMO = {
-    LINK_GITLAB: "Abrir o Merge Request",
     SEPARADOR: "·",
     SETA: "→",
 } as const;

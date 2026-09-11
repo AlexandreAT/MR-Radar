@@ -1,10 +1,12 @@
 import { ComentarioRevisao, RotuloRevisao } from "src/api/Revisao/types";
 import { TomEtiqueta } from "src/components/BasicComponents";
 import { SituacaoComentario } from "src/utils/ComentariosRevisao";
+import { Vocabulario } from "src/utils/Vocabulario";
 
 /** Propriedades aceitas pelo cartão de comentário. */
 export interface PropriedadesCartaoComentario {
     comentario: ComentarioRevisao;
+    vocabulario: Vocabulario;
 }
 
 /** Conteúdo de uma etiqueta exibida no cabeçalho do cartão. */
@@ -35,6 +37,5 @@ export const TEXTO_CARTAO = {
     TITULO_LOCAL: "Local",
     TITULO_CODIGO: "Código",
     TITULO_RESPOSTAS: "Respostas",
-    LINK_GITLAB: "Abrir no GitLab",
     SEPARADOR: " · ",
 } as const;

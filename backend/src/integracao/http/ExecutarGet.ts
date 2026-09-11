@@ -1,9 +1,17 @@
 import http, { IncomingHttpHeaders, OutgoingHttpHeaders } from "http";
 import https from "https";
-import { ErroGitLab } from "./ErroGitLab";
-import { API_GITLAB, CabecalhoGitLab, CodigoErroGitLab } from "./types";
+import { CodigoErroProvedor, ErroProvedor } from "../ErroProvedor";
+import { LIMITE_HTTP } from "../types";
+import { StatusHttp } from "../../utilidades/types";
 
 const STATUS_REDIRECIONAMENTO: number[] = [301, 302, 303, 307, 308];
+
+/**
+ * Cabeçalhos de autenticação removidos ao seguir redirecionamento para outra origem.
+ * A comparação é sempre em minúsculas: nomes de cabeçalho HTTP não diferenciam maiúsculas de
+ * minúsculas, mas os adapters gravam "PRIVATE-TOKEN" e "Authorization" com a caixa original.
+ */
+const CABECALHOS_DE_TOKEN: string[] = ["private-token", "authorization"];
 
 /** Resposta bruta de uma chamada HTTP. */
 export interface RespostaHttp {
@@ -21,11 +29,11 @@ export interface OpcoesRequisicao {
 
 /** Mensagens de orientação por código de erro de rede do Node. */
 const DICA_POR_ERRO_DE_REDE: Record<string, string> = {
-    ENOTFOUND: "Host não encontrado. Confira a variável GITLAB_URL e sua conexão de rede (VPN, se for o caso).",
+    ENOTFOUND: "Host não encontrado. Confira a URL configurada e sua conexão de rede (VPN, se for o caso).",
     ECONNREFUSED: "A conexão foi recusada pelo servidor. Confira a URL e a porta configuradas.",
     ETIMEDOUT: "O servidor não respondeu a tempo. Confira sua conexão de rede.",
     EAI_AGAIN: "Houve uma falha temporária de DNS. Confira sua conexão de rede.",
-    CERT_HAS_EXPIRED: "O certificado do servidor GitLab está expirado.",
+    CERT_HAS_EXPIRED: "O certificado do servidor está expirado.",
     DEPTH_ZERO_SELF_SIGNED_CERT: "O certificado é autoassinado. Aponte NODE_EXTRA_CA_CERTS para o certificado correto, conforme o README.",
     SELF_SIGNED_CERT_IN_CHAIN: "Há um certificado autoassinado na cadeia. Aponte NODE_EXTRA_CA_CERTS para o certificado correto, conforme o README.",
     UNABLE_TO_VERIFY_LEAF_SIGNATURE: "Não foi possível validar a cadeia de certificados. Aponte NODE_EXTRA_CA_CERTS para o certificado correto, conforme o README.",
@@ -33,13 +41,17 @@ const DICA_POR_ERRO_DE_REDE: Record<string, string> = {
 
 /**
  * Remove cabeçalhos de autenticação para que o token nunca vá para outra origem.
+ * A comparação ignora maiúsculas/minúsculas, para cobrir a caixa usada por qualquer adapter.
  * @param cabecalhos Cabeçalhos originais da requisição.
  * @returns Cópia dos cabeçalhos sem o token.
  */
 function removerToken(cabecalhos: OutgoingHttpHeaders): OutgoingHttpHeaders {
     const copia: OutgoingHttpHeaders = { ...cabecalhos };
-    delete copia[CabecalhoGitLab.Token];
-    delete copia.authorization;
+
+    Object.keys(copia).forEach((cabecalho) => {
+        if (CABECALHOS_DE_TOKEN.includes(cabecalho.toLowerCase()))
+            delete copia[cabecalho];
+    });
 
     return copia;
 }
@@ -49,11 +61,11 @@ function removerToken(cabecalhos: OutgoingHttpHeaders): OutgoingHttpHeaders {
  * @param erro Erro original lançado pelo módulo http/https.
  * @returns Erro pronto para ser devolvido ao frontend.
  */
-function converterErroDeRede(erro: NodeJS.ErrnoException): ErroGitLab {
+function converterErroDeRede(erro: NodeJS.ErrnoException): ErroProvedor {
     const codigoNode: string = erro.code ?? "";
     const dica: string = DICA_POR_ERRO_DE_REDE[codigoNode] ?? "Verifique sua conexão, a VPN e a URL configurada no arquivo .env.";
 
-    return new ErroGitLab(CodigoErroGitLab.FalhaRede, "Não foi possível conectar ao GitLab.", 502, dica);
+    return new ErroProvedor(CodigoErroProvedor.FalhaRede, "Não foi possível conectar ao servidor configurado.", StatusHttp.GatewayInvalido, dica);
 }
 
 /**
@@ -64,13 +76,13 @@ function converterErroDeRede(erro: NodeJS.ErrnoException): ErroGitLab {
  * @returns Status, cabeçalhos e corpo da resposta.
  */
 export function ExecutarGet(urlAlvo: string, opcoes: OpcoesRequisicao): Promise<RespostaHttp> {
-    const { cabecalhos, timeoutMs, redirecionamentosRestantes = API_GITLAB.MAX_REDIRECIONAMENTOS } = opcoes;
+    const { cabecalhos, timeoutMs, redirecionamentosRestantes = LIMITE_HTTP.MAX_REDIRECIONAMENTOS } = opcoes;
 
     return new Promise<RespostaHttp>((resolver, rejeitar) => {
         const url: URL | null = converterUrl(urlAlvo);
 
         if (!url) {
-            rejeitar(new ErroGitLab(CodigoErroGitLab.ConfiguracaoInvalida, "A URL do GitLab configurada é inválida.", 500, "Revise a variável GITLAB_URL no arquivo .env."));
+            rejeitar(new ErroProvedor(CodigoErroProvedor.ConfiguracaoInvalida, "A URL configurada é inválida.", StatusHttp.ErroInterno, "Revise a URL do provedor no arquivo .env."));
             return;
         }
 
@@ -94,8 +106,8 @@ export function ExecutarGet(urlAlvo: string, opcoes: OpcoesRequisicao): Promise<
             resposta.on("data", (parte: Buffer) => {
                 tamanho += parte.length;
 
-                if (tamanho > API_GITLAB.TAMANHO_MAX_RESPOSTA_BYTES) {
-                    requisicao.destroy(new ErroGitLab(CodigoErroGitLab.ArquivoMuitoGrande, "A resposta do GitLab passou do tamanho máximo permitido.", 502));
+                if (tamanho > LIMITE_HTTP.TAMANHO_MAX_RESPOSTA_BYTES) {
+                    requisicao.destroy(new ErroProvedor(CodigoErroProvedor.ArquivoMuitoGrande, "A resposta do servidor passou do tamanho máximo permitido.", StatusHttp.GatewayInvalido));
                     return;
                 }
                 partes.push(parte);
@@ -110,14 +122,14 @@ export function ExecutarGet(urlAlvo: string, opcoes: OpcoesRequisicao): Promise<
         });
 
         requisicao.setTimeout(timeoutMs, () => {
-            requisicao.destroy(new ErroGitLab(CodigoErroGitLab.TempoEsgotado, `O GitLab não respondeu em ${timeoutMs}ms.`, 504, "Aumente REQUEST_TIMEOUT_MS no .env ou verifique a rede."));
+            requisicao.destroy(new ErroProvedor(CodigoErroProvedor.TempoEsgotado, `O servidor não respondeu em ${timeoutMs}ms.`, StatusHttp.TempoEsgotado, "Aumente REQUEST_TIMEOUT_MS no .env ou verifique a rede."));
         });
 
         requisicao.on("error", (erro: NodeJS.ErrnoException) => {
             if (finalizada)
                 return;
             finalizada = true;
-            rejeitar(erro instanceof ErroGitLab ? erro : converterErroDeRede(erro));
+            rejeitar(erro instanceof ErroProvedor ? erro : converterErroDeRede(erro));
         });
 
         requisicao.end();
@@ -136,7 +148,7 @@ function seguirRedirecionamento(origem: URL, destino: string, opcoes: OpcoesRequ
     const novaUrl: URL | null = converterUrl(destino, origem);
 
     if (!novaUrl)
-        return Promise.reject(new ErroGitLab(CodigoErroGitLab.RespostaInesperada, "O GitLab respondeu com um redirecionamento inválido.", 502));
+        return Promise.reject(new ErroProvedor(CodigoErroProvedor.RespostaInesperada, "O servidor respondeu com um redirecionamento inválido.", StatusHttp.GatewayInvalido));
 
     const mesmaOrigem: boolean = novaUrl.origin === origem.origin;
 

@@ -1,7 +1,9 @@
 import { ConfiguracaoApp } from "../configuracao/types";
+import { CodigoErroProvedor, ErroProvedor } from "../integracao/ErroProvedor";
 import { ClienteGitLab } from "../integracao/gitlab/ClienteGitLab";
-import { CommitGitLab, IssueGitLab, MergeRequestRelacionadoGitLab, NotaGitLab, PaginaGitLab, UsuarioGitLab } from "../integracao/gitlab/types";
-import { DiaDeHoras, DiaUtil, HorasPorIssueNoDia, IssueComHoras, NivelElegibilidade, ParametrosConsultaHoras, ResumoHorasSemana } from "../models/Horas/types";
+import { CommitGitLab, IssueGitLab, MergeRequestRelacionadoGitLab, NotaGitLab, UsuarioGitLab } from "../integracao/gitlab/types";
+import { PaginaResultado } from "../integracao/types";
+import { DiaDeHoras, DiaUtil, HorasPorIssueNoDia, IssueComHoras, ParametrosConsultaHoras, ResumoHorasSemana } from "../models/Horas/types";
 import { MapearComLimite } from "../utilidades/Colecoes";
 import { DiaDaSemana, GetDataDeHoje, GetDataLocal, GetDiaDaSemana, GetSegundaDaSemana, SomarDias } from "../utilidades/Semana";
 import { DIAS_UTEIS_POR_SEMANA, HORAS_POR_DIA_UTIL, InterpretarNotaDeTempo, NotaTempoInterpretada, TipoNotaTempo } from "../utilidades/TempoGasto";
@@ -103,7 +105,7 @@ export class LogicaHoras {
             horasPorDiaEsperadas: HORAS_POR_DIA_UTIL,
             horasNoFimDeSemana: arredondar(horasDasIssues.reduce((total, item) => total + item.horasNoFimDeSemana, 0)),
             issues: horasDasIssues
-                .map((item) => converterIssue(item.issue, item.horasNaSemana, elegibilidade.porIssue.get(getChaveIssue(item.issue.project_id, item.issue.iid)) ?? NivelElegibilidade.SemCommit))
+                .map((item) => converterIssue(item.issue, item.horasNaSemana, elegibilidade.porIssue.get(getChaveIssue(item.issue.project_id, item.issue.iid)) ?? []))
                 .sort(compararIssues),
             consultadoEm: new Date().toISOString(),
             paginacaoTruncada: paginaIssues.truncada || horasDasIssues.some((item) => item.paginacaoTruncada) || elegibilidade.paginacaoTruncada,
@@ -127,7 +129,7 @@ export class LogicaHoras {
         fimDeSemana: string,
     ): Promise<HorasDaIssue[]> {
         return MapearComLimite(issues, this.configuracao.consultasSimultaneas, async (issue) => {
-            const paginaNotas: PaginaGitLab<NotaGitLab> = await this.cliente.GetNotasIssue(issue.project_id, issue.iid);
+            const paginaNotas: PaginaResultado<NotaGitLab> = await this.cliente.GetNotasIssue(issue.project_id, issue.iid);
             const lancamentos: LancamentoDeTempo[] = getLancamentosDoUsuario(paginaNotas.itens, usuario.id);
             const naSemana: LancamentoDeTempo[] = lancamentos.filter((lancamento) => lancamento.data >= inicioSemana && lancamento.data <= fimSemana);
             const noFimDeSemana: LancamentoDeTempo[] = lancamentos.filter((lancamento) => lancamento.data > fimSemana && lancamento.data <= fimDeSemana);
@@ -143,22 +145,23 @@ export class LogicaHoras {
     }
 
     /**
-     * Calcula, para cada issue, se o dono do token commitou nela hoje, nesta semana, ou não commitou.
+     * Descobre, para cada issue, em quais dias da semana o dono do token commitou nela. A tela usa
+     * essa lista crua para decidir o marcador (hoje/semana) conforme o dia de referência escolhido,
+     * em vez de o backend fixar de antemão qual dia conta como "hoje".
      * O vínculo entre issue e commit passa pelo Merge Request relacionado: a API não devolve
      * commits a partir da issue diretamente.
      * @param issues Issues devolvidas pelo GitLab.
      * @param usuario Usuário dono do token.
      * @param inicioSemana Segunda-feira da semana consultada.
      * @param fimDeSemana Domingo da semana consultada.
-     * @returns Nível de elegibilidade de cada issue, por chave, e indicação de paginação truncada.
+     * @returns Dias com commit de cada issue, por chave, e indicação de paginação truncada.
      */
     private async getElegibilidadeDasIssues(
         issues: IssueGitLab[],
         usuario: UsuarioGitLab,
         inicioSemana: string,
         fimDeSemana: string,
-    ): Promise<{ porIssue: Map<string, NivelElegibilidade>; paginacaoTruncada: boolean }> {
-        const hoje: string = GetDataDeHoje();
+    ): Promise<{ porIssue: Map<string, string[]>; paginacaoTruncada: boolean }> {
         const desde: string = SomarDias(inicioSemana, -MARGEM_FUSO_EM_DIAS) + INICIO_DO_DIA_UTC;
         const emailsDoUsuario: Set<string> = new Set([usuario.email, usuario.commit_email].filter((email): email is string => Boolean(email)).map((email) => email.toLowerCase()));
 
@@ -168,32 +171,42 @@ export class LogicaHoras {
             const chave: string = getChaveIssue(issue.project_id, issue.iid);
 
             try {
-                const relacionados: PaginaGitLab<MergeRequestRelacionadoGitLab> = await this.cliente.GetMergeRequestsRelacionados(issue.project_id, issue.iid);
+                const relacionados: PaginaResultado<MergeRequestRelacionadoGitLab> = await this.cliente.GetMergeRequestsRelacionados(issue.project_id, issue.iid);
 
                 if (relacionados.truncada)
                     paginacaoTruncada = true;
 
-                const commitsPorMr: PaginaGitLab<CommitGitLab>[] = await MapearComLimite(relacionados.itens, this.configuracao.consultasSimultaneas, (mr) =>
+                const commitsPorMr: PaginaResultado<CommitGitLab>[] = await MapearComLimite(relacionados.itens, this.configuracao.consultasSimultaneas, (mr) =>
                     this.cliente.GetCommitsRecentes(mr.project_id, mr.iid, desde),
                 );
 
-                const diasComCommitDoUsuario: string[] = commitsPorMr
-                    .flatMap((pagina) => {
-                        if (pagina.truncada)
-                            paginacaoTruncada = true;
+                const diasComCommitDoUsuario: string[] = Array.from(
+                    new Set(
+                        commitsPorMr
+                            .flatMap((pagina) => {
+                                if (pagina.truncada)
+                                    paginacaoTruncada = true;
 
-                        return pagina.itens;
-                    })
-                    .filter((commit) => emailsDoUsuario.has((commit.author_email ?? "").toLowerCase()))
-                    .map((commit) => GetDataLocal(new Date(commit.committed_date)))
-                    .filter((data) => data >= inicioSemana && data <= fimDeSemana);
+                                return pagina.itens;
+                            })
+                            .filter((commit) => emailsDoUsuario.has((commit.author_email ?? "").toLowerCase()))
+                            .map((commit) => GetDataLocal(new Date(commit.committed_date)))
+                            .filter((data) => data >= inicioSemana && data <= fimDeSemana),
+                    ),
+                );
 
-                return [chave, getNivelElegibilidade(diasComCommitDoUsuario, hoje)] as const;
-            } catch {
+                return [chave, diasComCommitDoUsuario] as const;
+            } catch (erro) {
+                // Token inválido ou sem acesso não é uma falha pontual: repetiria para toda issue e
+                // esconderia o problema real atrás de "sem commit" em todas elas. Isso precisa
+                // aparecer como erro de verdade, não ser engolido.
+                if (erro instanceof ErroProvedor && (erro.codigo === CodigoErroProvedor.TokenInvalido || erro.codigo === CodigoErroProvedor.AcessoNegado))
+                    throw erro;
+
                 // O GitLab às vezes devolve erro no endpoint de relacionados para uma issue específica
                 // (visto na prática, sem relação com os dados enviados). Uma falha aqui não pode
                 // impedir de ver as horas: a issue só fica sem o indicador de commit.
-                return [chave, NivelElegibilidade.SemCommit] as const;
+                return [chave, [] as string[]] as const;
             }
         });
 
@@ -278,19 +291,6 @@ function agruparPorIssue(lancamentos: (LancamentoDeTempo & { titulo: string })[]
 }
 
 /**
- * Decide o nível de elegibilidade a partir dos dias em que a issue recebeu commit do usuário.
- * @param diasComCommit Dias em que o usuário commitou na issue, dentro da semana.
- * @param hoje Data de hoje.
- * @returns Nível de elegibilidade da issue.
- */
-function getNivelElegibilidade(diasComCommit: string[], hoje: string): NivelElegibilidade {
-    if (diasComCommit.includes(hoje))
-        return NivelElegibilidade.CommitouHoje;
-
-    return diasComCommit.length > 0 ? NivelElegibilidade.CommitouNaSemana : NivelElegibilidade.SemCommit;
-}
-
-/**
  * Monta a chave única de uma issue, usada para casar o cálculo de elegibilidade com a issue certa.
  * @param projetoId ID numérico do projeto da issue.
  * @param issueIid IID da issue.
@@ -304,10 +304,10 @@ function getChaveIssue(projetoId: number | string, issueIid: number): string {
  * Converte a issue do GitLab para o formato exibido na tela.
  * @param issue Issue devolvida pela API.
  * @param horasNaSemana Horas que o usuário lançou nela na semana consultada.
- * @param elegibilidade Nível de confiança de que as horas lançadas correspondem a commits.
+ * @param diasComCommit Dias, dentro da semana, em que o usuário commitou nesta issue.
  * @returns Issue pronta para a lista.
  */
-function converterIssue(issue: IssueGitLab, horasNaSemana: number, elegibilidade: NivelElegibilidade): IssueComHoras {
+function converterIssue(issue: IssueGitLab, horasNaSemana: number, diasComCommit: string[]): IssueComHoras {
     return {
         projetoId: String(issue.project_id),
         caminhoProjeto: getCaminhoProjeto(issue),
@@ -318,7 +318,7 @@ function converterIssue(issue: IssueGitLab, horasNaSemana: number, elegibilidade
         atualizadoEm: issue.updated_at,
         horasNaSemana,
         horasTotais: arredondar((issue.time_stats?.total_time_spent ?? 0) / SEGUNDOS_POR_HORA),
-        elegibilidade,
+        diasComCommit,
     };
 }
 

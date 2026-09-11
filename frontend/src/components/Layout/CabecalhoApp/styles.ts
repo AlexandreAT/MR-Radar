@@ -60,7 +60,7 @@ export const Direita = styled.div`
     margin-left: auto;
 `;
 
-export const EnderecoGitLab = styled.span`
+export const EnderecoProvedor = styled.span`
     color: ${({ theme }) => theme.cores.textoSecundario};
     font-family: ${({ theme }) => theme.fontes.codigo};
     font-size: 12px;

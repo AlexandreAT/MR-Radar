@@ -1,4 +1,5 @@
 import { CodigoErroBackend, ConfiguracaoDashboard, StatusFiltro } from "src/api/Revisao/types";
+import { Vocabulario } from "src/utils/Vocabulario";
 
 /** Estado do botão de copiar comentários, para dar retorno visual do clique. */
 export enum EstadoCopia {
@@ -16,6 +17,9 @@ export const INTERVALO_PADRAO_SEGUNDOS = 30;
 /** Fator de conversão do intervalo escolhido na tela para o temporizador. */
 export const MILISSEGUNDOS_POR_SEGUNDO = 1000;
 
+/** Caracteres mínimos para pesquisar por título. Espelha LIMITE.TERMO_PESQUISA_MIN_CARACTERES do backend. */
+export const TERMO_PESQUISA_MIN_CARACTERES = 3;
+
 /**
  * Erros que não se resolvem sozinhos: quando um deles acontece durante a atualização
  * automática, ela é desligada para não ficar repetindo uma consulta que vai falhar de novo.
@@ -29,17 +33,36 @@ export const CODIGOS_ERRO_PERMANENTE: string[] = [
     CodigoErroBackend.LimiteRequisicoes,
 ];
 
-/** Mensagens exibidas no painel. */
+/** Mensagens exibidas no painel, iguais em qualquer provedor. */
 export const MENSAGEM = {
-    CAMPOS_OBRIGATORIOS: "Informe o Project ID e o IID do Merge Request para buscar.",
     ERRO_INESPERADO: "Não foi possível carregar os comentários.",
-    ERRO_LISTA: "Não foi possível carregar os seus Merge Requests.",
-    SEM_BUSCA: "Escolha um Merge Request na lista acima, ou informe o Project ID e o IID e clique em Buscar.",
     SEM_COMENTARIOS: "Nenhum comentário encontrado para este filtro.",
     PAGINACAO_TRUNCADA: "Havia mais páginas de comentários do que o limite configurado. Aumente MAX_PAGES no arquivo .env.",
     CONTADOR_EXIBIDO: "comentário exibido",
     CONTADOR_EXIBIDOS: "comentários exibidos",
+    ERRO_PESQUISA: "Não foi possível pesquisar.",
+    ERRO_TRECHO_SEM_PERMISSAO: "Alguns comentários não puderam mostrar o trecho de código.",
 } as const;
+
+/** Mensagens do painel que citam os termos do provedor ativo. */
+export interface MensagensDoProvedor {
+    CAMPOS_OBRIGATORIOS: string;
+    ERRO_LISTA: string;
+    SEM_BUSCA: string;
+}
+
+/**
+ * Monta as mensagens que mudam de texto conforme o provedor configurado.
+ * @param vocabulario Termos do provedor ativo.
+ * @returns Mensagens já escritas com o vocabulário do provedor.
+ */
+export function GetMensagensDoProvedor(vocabulario: Vocabulario): MensagensDoProvedor {
+    return {
+        CAMPOS_OBRIGATORIOS: `Informe o ${vocabulario.rotuloProjeto} e o ${vocabulario.rotuloNumero} para buscar.`,
+        ERRO_LISTA: `Não foi possível carregar os seus ${vocabulario.nomeItemPlural}.`,
+        SEM_BUSCA: `Escolha um ${vocabulario.nomeItem} na lista acima, ou preencha os campos e clique em Buscar.`,
+    };
+}
 
 /** Texto do botão de copiar comentários, conforme o estado do clique. */
 export const TEXTO_POR_ESTADO_COPIA: Record<EstadoCopia, string> = {

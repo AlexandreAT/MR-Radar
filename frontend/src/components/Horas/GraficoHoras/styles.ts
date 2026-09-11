@@ -32,9 +32,11 @@ export const Barra = styled.rect<{ $estado: EstadoDia }>`
     pointer-events: none;
 `;
 
-export const Trilho = styled.rect`
+export const Trilho = styled.rect<{ $selecionada: boolean }>`
     fill: ${({ theme }) => theme.cores.fundoCampo};
-    cursor: default;
+    stroke: ${({ $selecionada, theme }) => ($selecionada ? theme.cores.primaria : "transparent")};
+    stroke-width: 2;
+    cursor: pointer;
 `;
 
 export const LinhaEsperada = styled.line`

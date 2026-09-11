@@ -1,7 +1,6 @@
 import { ConfiguracaoApp } from "../configuracao/types";
-import { ClienteGitLab } from "../integracao/gitlab/ClienteGitLab";
-import { ErroGitLab } from "../integracao/gitlab/ErroGitLab";
-import { CodigoErroGitLab } from "../integracao/gitlab/types";
+import { ClienteRevisao } from "../integracao/ClienteRevisao";
+import { CodigoErroProvedor, ErroProvedor } from "../integracao/ErroProvedor";
 import { CodigoErroTrecho, ErroTrecho, LinhaTrecho } from "../models/Revisao/types";
 import { GetLinguagem } from "../utilidades/Linguagem";
 import { ArquivoEmCache, PosicaoResolvida, ResultadoTrecho } from "./types";
@@ -14,34 +13,39 @@ const BOM = "\uFEFF";
 
 /** Mensagem exibida para cada motivo de falha ao montar o trecho. */
 const MENSAGEM_POR_ERRO: Record<CodigoErroTrecho, string> = {
-    [CodigoErroTrecho.SemPosicao]: "Este comentário não está ligado a um arquivo, é um comentário geral do Merge Request.",
+    [CodigoErroTrecho.SemPosicao]: "Este comentário não está ligado a um arquivo, é um comentário geral da revisão.",
     [CodigoErroTrecho.SemLinha]: "Este comentário está ligado ao arquivo inteiro ou a um anexo, sem uma linha específica.",
     [CodigoErroTrecho.RefIndisponivel]: "O comentário não informa o commit do trecho, então não foi possível buscar o código.",
     [CodigoErroTrecho.ArquivoNaoEncontrado]: "O arquivo não existe neste commit. Ele pode ter sido removido ou renomeado.",
     [CodigoErroTrecho.ArquivoBinario]: "O arquivo é binário e não tem trecho de código para mostrar.",
     [CodigoErroTrecho.ArquivoMuitoGrande]: "O arquivo é grande demais para ser exibido aqui.",
     [CodigoErroTrecho.LinhaForaDoArquivo]: "A linha comentada não existe mais na versão do arquivo neste commit.",
-    [CodigoErroTrecho.FalhaAoBuscar]: "Não foi possível buscar o conteúdo do arquivo no GitLab.",
+    [CodigoErroTrecho.FalhaAoBuscar]: "Não foi possível buscar o conteúdo do arquivo.",
+    [CodigoErroTrecho.SemPermissao]: "Seu token não tem permissão para buscar o conteúdo deste arquivo.",
 };
 
 /** Motivo de falha correspondente a cada erro devolvido pela integração. */
-const ERRO_TRECHO_POR_ERRO_GITLAB: Partial<Record<CodigoErroGitLab, CodigoErroTrecho>> = {
-    [CodigoErroGitLab.NaoEncontrado]: CodigoErroTrecho.ArquivoNaoEncontrado,
-    [CodigoErroGitLab.ArquivoBinario]: CodigoErroTrecho.ArquivoBinario,
-    [CodigoErroGitLab.ArquivoMuitoGrande]: CodigoErroTrecho.ArquivoMuitoGrande,
+const ERRO_TRECHO_POR_ERRO_PROVEDOR: Partial<Record<CodigoErroProvedor, CodigoErroTrecho>> = {
+    [CodigoErroProvedor.NaoEncontrado]: CodigoErroTrecho.ArquivoNaoEncontrado,
+    [CodigoErroProvedor.ArquivoBinario]: CodigoErroTrecho.ArquivoBinario,
+    [CodigoErroProvedor.ArquivoMuitoGrande]: CodigoErroTrecho.ArquivoMuitoGrande,
+    // No GitHub, buscar o conteúdo do arquivo exige a permissão "Contents", separada da usada
+    // pelo resto do dashboard — um token sem ela falha só aqui, silenciosamente, sem este mapeamento.
+    [CodigoErroProvedor.TokenInvalido]: CodigoErroTrecho.SemPermissao,
+    [CodigoErroProvedor.AcessoNegado]: CodigoErroTrecho.SemPermissao,
 };
 
 /** Monta o trecho de código exibido em cada comentário de revisão. */
 export class LogicaTrechoCodigo {
-    private readonly cliente: ClienteGitLab;
+    private readonly cliente: ClienteRevisao;
     private readonly configuracao: ConfiguracaoApp;
     private readonly cacheArquivos = new Map<string, ArquivoEmCache>();
 
     /**
-     * @param cliente Cliente somente leitura da API do GitLab.
+     * @param cliente Cliente somente leitura do provedor configurado.
      * @param configuracao Configuração da aplicação.
      */
-    constructor(cliente: ClienteGitLab, configuracao: ConfiguracaoApp) {
+    constructor(cliente: ClienteRevisao, configuracao: ConfiguracaoApp) {
         this.cliente = cliente;
         this.configuracao = configuracao;
     }
@@ -105,7 +109,7 @@ export class LogicaTrechoCodigo {
     }
 
     /**
-     * Busca o conteúdo de um arquivo no GitLab e converte falhas conhecidas em motivos de erro.
+     * Busca o conteúdo de um arquivo no provedor e converte falhas conhecidas em motivos de erro.
      * @param projetoId ID numérico ou caminho do projeto.
      * @param caminhoArquivo Caminho do arquivo no repositório.
      * @param ref Commit usado como referência.
@@ -117,8 +121,8 @@ export class LogicaTrechoCodigo {
 
             return { expiraEm: 0, linhas: separarLinhas(conteudo) };
         } catch (erro) {
-            const codigoGitLab: CodigoErroGitLab | null = erro instanceof ErroGitLab ? erro.codigo : null;
-            const codigoTrecho: CodigoErroTrecho = (codigoGitLab && ERRO_TRECHO_POR_ERRO_GITLAB[codigoGitLab]) ?? CodigoErroTrecho.FalhaAoBuscar;
+            const codigoProvedor: CodigoErroProvedor | null = erro instanceof ErroProvedor ? erro.codigo : null;
+            const codigoTrecho: CodigoErroTrecho = (codigoProvedor && ERRO_TRECHO_POR_ERRO_PROVEDOR[codigoProvedor]) ?? CodigoErroTrecho.FalhaAoBuscar;
 
             return { expiraEm: 0, erro: montarErro(codigoTrecho) };
         }

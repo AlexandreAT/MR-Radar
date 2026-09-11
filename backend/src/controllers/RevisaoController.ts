@@ -1,18 +1,27 @@
 import { Request, Response, Router } from "express";
 import { ConfiguracaoApp, LIMITE } from "../configuracao/types";
 import { GarantirConfiguracaoValida, ValidarConfiguracao } from "../configuracao/Configuracao";
-import { ErroGitLab } from "../integracao/gitlab/ErroGitLab";
-import { CodigoErroGitLab } from "../integracao/gitlab/types";
+import { CodigoErroProvedor, ErroProvedor } from "../integracao/ErroProvedor";
 import { LogicaMergeRequest } from "../logica/LogicaMergeRequest";
 import { LogicaRevisao } from "../logica/LogicaRevisao";
-import { ConfiguracaoDashboard, EscopoMergeRequest, ListaMergeRequestsAbertos, ParametrosConsultaRevisao, RevisaoMergeRequest, StatusFiltro } from "../models/Revisao/types";
+import {
+    ConfiguracaoDashboard,
+    EscopoMergeRequest,
+    ListaMergeRequestsAbertos,
+    PaginaArquivosAlterados,
+    ParametrosConsultaRevisao,
+    ResultadoPesquisaMergeRequests,
+    RevisaoMergeRequest,
+    StatusFiltro,
+} from "../models/Revisao/types";
 import { Envolver } from "../utilidades/Assincrono";
+import { GetTermosProvedor, TermosProvedor } from "../utilidades/TermosProvedor";
 import { StatusHttp } from "../utilidades/types";
 
 /** Formato aceito para o identificador do projeto: ID numérico ou caminho do repositório. */
 const PROJETO_VALIDO = /^[A-Za-z0-9._\-/]{1,200}$/;
 
-/** Formato aceito para o IID do Merge Request. */
+/** Formato aceito para o número do item de revisão (IID do Merge Request, Number do Pull Request). */
 const MR_IID_VALIDO = /^\d{1,10}$/;
 
 /** Nomes dos parâmetros aceitos na query string. */
@@ -20,7 +29,12 @@ enum ParametroConsulta {
     Status = "status",
     LinhasContexto = "contexto",
     Escopo = "escopo",
+    Pagina = "pagina",
+    Termo = "termo",
 }
+
+/** Primeira página aceita ao listar os arquivos alterados. */
+const PRIMEIRA_PAGINA = 1;
 
 /**
  * Registra as rotas de consulta de revisão.
@@ -48,6 +62,17 @@ export function CriarRotasRevisao(logicaRevisao: LogicaRevisao, logicaMergeReque
     );
 
     rotas.get(
+        "/merge-requests/pesquisar",
+        Envolver(async (requisicao: Request, resposta: Response) => {
+            GarantirConfiguracaoValida(configuracao);
+
+            const resultado: ResultadoPesquisaMergeRequests = await logicaMergeRequest.Buscar(lerTermo(requisicao, configuracao));
+
+            resposta.json(resultado);
+        }),
+    );
+
+    rotas.get(
         "/merge-request/:projectId/:mrIid/open-discussions",
         Envolver(async (requisicao: Request, resposta: Response) => {
             GarantirConfiguracaoValida(configuracao);
@@ -56,6 +81,18 @@ export function CriarRotasRevisao(logicaRevisao: LogicaRevisao, logicaMergeReque
             const revisao: RevisaoMergeRequest = await logicaRevisao.GetRevisao(parametros);
 
             resposta.json(revisao);
+        }),
+    );
+
+    rotas.get(
+        "/merge-request/:projectId/:mrIid/arquivos-alterados",
+        Envolver(async (requisicao: Request, resposta: Response) => {
+            GarantirConfiguracaoValida(configuracao);
+
+            const { projetoId, mrIid } = lerIdentificadores(requisicao, configuracao);
+            const pagina: PaginaArquivosAlterados = await logicaRevisao.GetArquivosAlterados(projetoId, mrIid, lerPagina(requisicao));
+
+            resposta.json(pagina);
         }),
     );
 
@@ -69,7 +106,8 @@ export function CriarRotasRevisao(logicaRevisao: LogicaRevisao, logicaMergeReque
  */
 function montarConfiguracaoDashboard(configuracao: ConfiguracaoApp): ConfiguracaoDashboard {
     return {
-        urlGitLab: configuracao.urlGitLab,
+        provedor: configuracao.provedor,
+        urlProvedor: configuracao.urlBase,
         tokenConfigurado: Boolean(configuracao.token),
         linhasContexto: configuracao.linhasContexto,
         somenteLeitura: true,
@@ -77,21 +115,46 @@ function montarConfiguracaoDashboard(configuracao: ConfiguracaoApp): Configuraca
     };
 }
 
+/** Projeto e Merge Request identificados na URL, já validados. */
+interface Identificadores {
+    projetoId: string;
+    mrIid: string;
+}
+
+/**
+ * Lê e valida o projeto e o Merge Request identificados na URL da rota.
+ * Compartilhada por toda rota que recebe :projectId/:mrIid, para não repetir a validação.
+ * @param requisicao Requisição recebida.
+ * @param configuracao Configuração da aplicação, usada para os termos do provedor ativo.
+ * @returns Projeto e Merge Request já validados.
+ */
+function lerIdentificadores(requisicao: Request, configuracao: ConfiguracaoApp): Identificadores {
+    const projetoId: string = String(requisicao.params.projectId ?? "").trim();
+    const mrIid: string = String(requisicao.params.mrIid ?? "").trim();
+    const termos: TermosProvedor = GetTermosProvedor(configuracao.provedor);
+
+    if (!PROJETO_VALIDO.test(projetoId))
+        throw new ErroProvedor(CodigoErroProvedor.ParametroInvalido, `O ${termos.rotuloProjeto} informado não é válido.`, StatusHttp.RequisicaoInvalida, termos.dicaProjeto);
+
+    if (!MR_IID_VALIDO.test(mrIid))
+        throw new ErroProvedor(
+            CodigoErroProvedor.ParametroInvalido,
+            `O ${termos.rotuloNumero} informado não é válido.`,
+            StatusHttp.RequisicaoInvalida,
+            `Informe apenas o número que aparece na URL do ${termos.nomeItem}.`,
+        );
+
+    return { projetoId, mrIid };
+}
+
 /**
  * Lê e valida os parâmetros da consulta de comentários.
  * @param requisicao Requisição recebida.
- * @param configuracao Configuração da aplicação, usada para os valores padrão.
+ * @param configuracao Configuração da aplicação, usada para os valores padrão e os termos do provedor ativo.
  * @returns Parâmetros já validados.
  */
 function lerParametros(requisicao: Request, configuracao: ConfiguracaoApp): ParametrosConsultaRevisao {
-    const projetoId: string = String(requisicao.params.projectId ?? "").trim();
-    const mrIid: string = String(requisicao.params.mrIid ?? "").trim();
-
-    if (!PROJETO_VALIDO.test(projetoId))
-        throw new ErroGitLab(CodigoErroGitLab.ParametroInvalido, "O Project ID informado não é válido.", StatusHttp.RequisicaoInvalida, "Use o ID numérico do projeto ou o caminho completo, como grupo/subgrupo/projeto.");
-
-    if (!MR_IID_VALIDO.test(mrIid))
-        throw new ErroGitLab(CodigoErroGitLab.ParametroInvalido, "O IID do Merge Request informado não é válido.", StatusHttp.RequisicaoInvalida, "Informe apenas o número que aparece na URL do Merge Request.");
+    const { projetoId, mrIid } = lerIdentificadores(requisicao, configuracao);
 
     return {
         projetoId,
@@ -99,6 +162,17 @@ function lerParametros(requisicao: Request, configuracao: ConfiguracaoApp): Para
         status: lerStatus(requisicao),
         linhasContexto: lerLinhasContexto(requisicao, configuracao),
     };
+}
+
+/**
+ * Lê a página pedida ao listar os arquivos alterados.
+ * @param requisicao Requisição recebida.
+ * @returns Página pedida, ou a primeira quando o parâmetro faltar ou for inválido.
+ */
+function lerPagina(requisicao: Request): number {
+    const informada: number = Number.parseInt(String(requisicao.query[ParametroConsulta.Pagina] ?? ""), 10);
+
+    return Number.isFinite(informada) && informada >= PRIMEIRA_PAGINA ? informada : PRIMEIRA_PAGINA;
 }
 
 /**
@@ -123,6 +197,27 @@ function lerEscopo(requisicao: Request): EscopoMergeRequest {
     const escoposValidos: string[] = Object.values(EscopoMergeRequest);
 
     return escoposValidos.includes(valor) ? (valor as EscopoMergeRequest) : EscopoMergeRequest.CriadosPorMim;
+}
+
+/**
+ * Lê e valida o termo pesquisado no título dos Merge Requests.
+ * @param requisicao Requisição recebida.
+ * @param configuracao Configuração da aplicação, usada para os termos do provedor ativo.
+ * @returns Termo já validado.
+ */
+function lerTermo(requisicao: Request, configuracao: ConfiguracaoApp): string {
+    const termo: string = String(requisicao.query[ParametroConsulta.Termo] ?? "").trim();
+    const termos: TermosProvedor = GetTermosProvedor(configuracao.provedor);
+
+    if (termo.length < LIMITE.TERMO_PESQUISA_MIN_CARACTERES)
+        throw new ErroProvedor(
+            CodigoErroProvedor.ParametroInvalido,
+            `Informe pelo menos ${LIMITE.TERMO_PESQUISA_MIN_CARACTERES} caracteres para pesquisar.`,
+            StatusHttp.RequisicaoInvalida,
+            `A pesquisa procura no título dos ${termos.nomeItem}s abertos que o token enxerga.`,
+        );
+
+    return termo;
 }
 
 /**

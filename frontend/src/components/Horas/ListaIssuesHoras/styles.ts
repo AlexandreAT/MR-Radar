@@ -1,5 +1,5 @@
 import styled, { DefaultTheme } from "styled-components";
-import { NivelElegibilidade } from "src/api/Horas/types";
+import { NivelElegibilidade } from "src/utils/Elegibilidade";
 import { PainelBase } from "../../sharedStyles";
 
 /**
@@ -9,7 +9,7 @@ import { PainelBase } from "../../sharedStyles";
  * @returns Cor em hexadecimal.
  */
 function getCorElegibilidade(nivel: NivelElegibilidade, theme: DefaultTheme): string {
-    return nivel === NivelElegibilidade.CommitouHoje ? theme.cores.resolvido : theme.cores.aberto;
+    return nivel === NivelElegibilidade.CommitouNoDiaDeReferencia ? theme.cores.resolvido : theme.cores.aberto;
 }
 
 export const Container = styled(PainelBase)`
@@ -65,7 +65,7 @@ export const Horas = styled.div`
     gap: ${({ theme }) => theme.espacamentos.pequeno};
 `;
 
-export const MarcadorElegibilidade = styled.span<{ $nivel: NivelElegibilidade }>`
+export const PontoElegibilidade = styled.span<{ $nivel: NivelElegibilidade }>`
     display: inline-block;
     width: 7px;
     height: 7px;

@@ -1,7 +1,10 @@
 import express, { Express } from "express";
 import { configuracao, ValidarConfiguracao } from "./configuracao/Configuracao";
+import { Provedor } from "./configuracao/types";
 import { CriarRotasHoras } from "./controllers/HorasController";
 import { CriarRotasRevisao } from "./controllers/RevisaoController";
+import { ClienteRevisao } from "./integracao/ClienteRevisao";
+import { ClienteGitHub } from "./integracao/github/ClienteGitHub";
 import { ClienteGitLab } from "./integracao/gitlab/ClienteGitLab";
 import { LogicaHoras } from "./logica/LogicaHoras";
 import { LogicaMergeRequest } from "./logica/LogicaMergeRequest";
@@ -13,23 +16,36 @@ import { RotaNaoEncontrada, TratadorDeErros } from "./middlewares/TratadorDeErro
 /** Prefixo de todas as rotas do backend. */
 const PREFIXO_API = "/api";
 
+/** Nome exibido de cada provedor, usado nas mensagens do console. */
+const NOME_DO_PROVEDOR: Record<Provedor, string> = {
+    [Provedor.GitLab]: "GitLab",
+    [Provedor.GitHub]: "GitHub",
+};
+
 /**
  * Monta a aplicação Express com os middlewares e as rotas do dashboard.
+ *
+ * A página de horas existe só no GitLab: ela é montada em cima do Time tracking, que o GitHub
+ * não tem. No modo GitHub a rota simplesmente não é registrada.
  * @returns Aplicação pronta para escutar em uma porta.
  */
 function criarAplicacao(): Express {
-    const cliente = new ClienteGitLab(configuracao);
+    const ehGitLab: boolean = configuracao.provedor === Provedor.GitLab;
+    const cliente: ClienteRevisao = ehGitLab ? new ClienteGitLab(configuracao) : new ClienteGitHub(configuracao);
+
     const logicaTrechoCodigo = new LogicaTrechoCodigo(cliente, configuracao);
     const logicaRevisao = new LogicaRevisao(cliente, logicaTrechoCodigo, configuracao);
     const logicaMergeRequest = new LogicaMergeRequest(cliente);
-    const logicaHoras = new LogicaHoras(cliente, configuracao);
 
     const aplicacao: Express = express();
     aplicacao.disable("x-powered-by");
     aplicacao.use(LiberarOrigemLocal);
     aplicacao.use(SomenteLeitura);
     aplicacao.use(PREFIXO_API, CriarRotasRevisao(logicaRevisao, logicaMergeRequest, configuracao));
-    aplicacao.use(PREFIXO_API, CriarRotasHoras(logicaHoras, configuracao));
+
+    if (cliente instanceof ClienteGitLab)
+        aplicacao.use(PREFIXO_API, CriarRotasHoras(new LogicaHoras(cliente, configuracao), configuracao));
+
     aplicacao.use(RotaNaoEncontrada);
     aplicacao.use(TratadorDeErros);
 
@@ -42,13 +58,14 @@ function criarAplicacao(): Express {
  */
 function avisarProblemasDeConfiguracao(): void {
     const problemas: string[] = ValidarConfiguracao(configuracao);
+    const nome: string = NOME_DO_PROVEDOR[configuracao.provedor];
 
     if (!problemas.length) {
-        console.log(`GitLab configurado: ${configuracao.urlGitLab}`);
+        console.log(`${nome} configurado: ${configuracao.urlBase}`);
         return;
     }
 
-    console.warn("Atenção: o backend subiu, mas ainda não consegue consultar o GitLab.");
+    console.warn(`Atenção: o backend subiu, mas ainda não consegue consultar o ${nome}.`);
     problemas.forEach((problema) => console.warn(` - ${problema}`));
     console.warn(`Crie o arquivo backend/.env a partir de backend/.env.example e preencha os dados.`);
 }
