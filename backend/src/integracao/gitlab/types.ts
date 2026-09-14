@@ -244,6 +244,14 @@ export interface ItemArvoreGitLab {
 }
 
 /**
+ * Issue devolvida pelo endpoint de "closes_issues" de um Merge Request.
+ * Só as tags interessam aqui: é delas que sai o status do chamado exibido na tela.
+ */
+export interface IssueRelacionadaGitLab {
+    labels: string[];
+}
+
+/**
  * Diff de um único arquivo dentro do Merge Request.
  *
  * "diff" vem vazio tanto quando too_large é verdadeiro quanto em alguns arquivos com collapsed

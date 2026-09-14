@@ -2,12 +2,13 @@ import { OutgoingHttpHeaders } from "http";
 import { ConfiguracaoApp, LIMITE } from "../../configuracao/types";
 import { DiscussaoNormalizada } from "../../logica/types";
 import { EscopoMergeRequest, MergeRequestAberto, MergeRequestResumo, PaginaArquivosAlterados } from "../../models/Revisao/types";
+import { MapearComLimite } from "../../utilidades/Colecoes";
 import { StatusHttp } from "../../utilidades/types";
 import { ClienteRevisao } from "../ClienteRevisao";
 import { CodigoErroProvedor, ErroProvedor } from "../ErroProvedor";
 import { ExecutarGet, RespostaHttp } from "../http/ExecutarGet";
 import { PaginaResultado } from "../types";
-import { ConverterArquivoAlterado, ConverterMergeRequest, ConverterMergeRequestAberto, NormalizarDiscussoes } from "./ConversorGitLab";
+import { ConverterArquivoAlterado, ConverterMergeRequest, ConverterMergeRequestAberto, InterpretarStatusChamado, NormalizarDiscussoes } from "./ConversorGitLab";
 import {
     AcaoEventoGitLab,
     API_GITLAB,
@@ -22,6 +23,7 @@ import {
     EstadoMergeRequestGitLab,
     EventoGitLab,
     IssueGitLab,
+    IssueRelacionadaGitLab,
     ItemArvoreGitLab,
     MergeRequestGitLab,
     MergeRequestListaGitLab,
@@ -75,8 +77,9 @@ export class ClienteGitLab implements ClienteRevisao {
             order_by: "updated_at",
             sort: "desc",
         });
+        const mergeRequests: MergeRequestAberto[] = await this.enriquecerComStatusChamado(pagina.itens.map(ConverterMergeRequestAberto));
 
-        return { itens: pagina.itens.map(ConverterMergeRequestAberto), truncada: pagina.truncada };
+        return { itens: mergeRequests, truncada: pagina.truncada };
     }
 
     /**
@@ -93,8 +96,9 @@ export class ClienteGitLab implements ClienteRevisao {
             order_by: "updated_at",
             sort: "desc",
         });
+        const mergeRequests: MergeRequestAberto[] = await this.enriquecerComStatusChamado(pagina.itens.map(ConverterMergeRequestAberto));
 
-        return { itens: pagina.itens.map(ConverterMergeRequestAberto), truncada: pagina.truncada };
+        return { itens: mergeRequests, truncada: pagina.truncada };
     }
 
     /**
@@ -277,6 +281,45 @@ export class ClienteGitLab implements ClienteRevisao {
 
             pagina = proximaPagina;
         }
+    }
+
+    /**
+     * Enriquece cada Merge Request com o status e a validade do chamado vinculado a ele.
+     *
+     * Uma falha pontual em um Merge Request (chamado apagado, projeto sem permissão de issues
+     * etc.) não invalida os demais — só aquele item fica sem status. Já token inválido ou sem
+     * acesso falha do mesmo jeito para todos os itens, então o erro é relançado em vez de virar
+     * "sem status" silencioso em cada um deles.
+     * @param mergeRequests Merge Requests já convertidos, sem o status do chamado.
+     * @returns Os mesmos Merge Requests, com statusChamado e chamadoValido preenchidos quando possível.
+     */
+    private async enriquecerComStatusChamado(mergeRequests: MergeRequestAberto[]): Promise<MergeRequestAberto[]> {
+        return MapearComLimite(mergeRequests, this.configuracao.consultasSimultaneas, async (mergeRequest) => {
+            try {
+                const labels: string[] | null = await this.getLabelsDoChamado(mergeRequest.projetoId, mergeRequest.iid);
+
+                return { ...mergeRequest, ...InterpretarStatusChamado(labels) };
+            } catch (erro) {
+                if (erro instanceof ErroProvedor && (erro.codigo === CodigoErroProvedor.TokenInvalido || erro.codigo === CodigoErroProvedor.AcessoNegado))
+                    throw erro;
+
+                return mergeRequest;
+            }
+        });
+    }
+
+    /**
+     * Busca as tags do chamado (issue) que o Merge Request fecha.
+     * @param projetoId ID numérico ou caminho do projeto.
+     * @param mrIid IID do Merge Request.
+     * @returns Tags do primeiro chamado vinculado, ou nulo quando não há chamado vinculado.
+     */
+    private async getLabelsDoChamado(projetoId: string, mrIid: number): Promise<string[] | null> {
+        const issuesFechadas: IssueRelacionadaGitLab[] = await this.getJson<IssueRelacionadaGitLab[]>(
+            `/projects/${encodeURIComponent(projetoId)}/merge_requests/${mrIid}/closes_issues`,
+        );
+
+        return issuesFechadas[0]?.labels ?? null;
     }
 
     /**

@@ -1,5 +1,5 @@
 import { DiscussaoNormalizada, NotaNormalizada, PosicaoResolvida } from "../../logica/types";
-import { ArquivoAlterado, Autor, LadoDiff, LinhaDiff, MergeRequestAberto, MergeRequestResumo, StatusArquivoAlterado, TipoLinhaDiff } from "../../models/Revisao/types";
+import { ArquivoAlterado, Autor, LadoDiff, LinhaDiff, MergeRequestAberto, MergeRequestResumo, StatusArquivoAlterado, StatusChamado, TipoLinhaDiff } from "../../models/Revisao/types";
 import { EstaNaListaDeIgnorados } from "../../utilidades/AutorSistema";
 import { InterpretarDiffUnificado } from "../../utilidades/DiffUnificado";
 import { GetLinguagem } from "../../utilidades/Linguagem";
@@ -23,6 +23,18 @@ const MOTIVO_DIFF_INDISPONIVEL = "Arquivo grande demais para exibir aqui — abr
 
 /** Separador entre o caminho do projeto e o IID na referência do GitLab. */
 const SEPARADOR_REFERENCIA = "!";
+
+/** Tag de cada status conhecido do quadro, na grafia exata usada nele. */
+const STATUS_CHAMADO_POR_TAG: Record<string, StatusChamado> = {
+    Started: StatusChamado.Started,
+    Testing: StatusChamado.Testing,
+    "Ready for development": StatusChamado.ReadyForDevelopment,
+    Revision: StatusChamado.Revision,
+};
+
+/** Tags de validade do chamado, na grafia exata usada no quadro. */
+const TAG_CHAMADO_VALIDO = "Válido";
+const TAG_CHAMADO_INVALIDO = "Inválido";
 
 /**
  * Nome de usuário que o próprio GitLab gera para bots de Project/Group Access Token,
@@ -226,7 +238,10 @@ export function ConverterMergeRequestAberto(mergeRequest: MergeRequestListaGitLa
         iid: mergeRequest.iid,
         titulo: mergeRequest.title,
         url: mergeRequest.web_url,
-        rascunho: mergeRequest.draft ?? mergeRequest.work_in_progress ?? false,
+        // O status e a validade do chamado dependem de uma chamada à parte (o vínculo com a issue
+        // não vem nesta listagem) — entram depois, via InterpretarStatusChamado.
+        statusChamado: null,
+        chamadoValido: null,
         branchOrigem: mergeRequest.source_branch,
         branchDestino: mergeRequest.target_branch,
         atualizadoEm: mergeRequest.updated_at,
@@ -234,6 +249,28 @@ export function ConverterMergeRequestAberto(mergeRequest: MergeRequestListaGitLa
         temThreadsAbertas: getTemThreadsAbertas(mergeRequest),
         totalComentarios: mergeRequest.user_notes_count ?? 0,
     };
+}
+
+/** Status e validade do chamado, lidos das tags dele. */
+export interface StatusDoChamado {
+    statusChamado: StatusChamado | null;
+    chamadoValido: boolean | null;
+}
+
+/**
+ * Lê o status e a validade do chamado a partir das tags dele, usando só a lista fixa de status
+ * conhecida do quadro — qualquer outra tag (nome de cliente, de responsável etc.) é ignorada.
+ * @param labels Tags do chamado vinculado, ou nulo quando o Merge Request não tem chamado vinculado.
+ * @returns Status reconhecido e validade, ou ambos nulos quando não há chamado ou nenhuma tag bate.
+ */
+export function InterpretarStatusChamado(labels: string[] | null): StatusDoChamado {
+    if (!labels)
+        return { statusChamado: null, chamadoValido: null };
+
+    const statusChamado: StatusChamado | null = labels.map((label) => STATUS_CHAMADO_POR_TAG[label]).find((status) => status !== undefined) ?? null;
+    const chamadoValido: boolean | null = labels.includes(TAG_CHAMADO_VALIDO) ? true : labels.includes(TAG_CHAMADO_INVALIDO) ? false : null;
+
+    return { statusChamado, chamadoValido };
 }
 
 /**

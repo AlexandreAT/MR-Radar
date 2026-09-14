@@ -141,6 +141,17 @@ export enum EscopoMergeRequest {
     AtribuidosAMim = "atribuidos_a_mim",
 }
 
+/**
+ * Status do chamado (issue) vinculado ao Merge Request, reconhecido a partir das tags dele.
+ * Só os valores conhecidos do quadro contam — qualquer outra tag no chamado é ignorada aqui.
+ */
+export enum StatusChamado {
+    Started = "Started",
+    Testing = "Testing",
+    ReadyForDevelopment = "Ready for development",
+    Revision = "Revision",
+}
+
 /** Merge Request aberto exibido no seletor da tela. */
 export interface MergeRequestAberto {
     projetoId: string;
@@ -148,7 +159,10 @@ export interface MergeRequestAberto {
     iid: number;
     titulo: string;
     url: string;
-    rascunho: boolean;
+    /** Status do chamado vinculado, quando reconhecido. Só existe no GitLab. */
+    statusChamado: StatusChamado | null;
+    /** Tag "Válido"/"Inválido" do chamado vinculado, quando existir. Só existe no GitLab. */
+    chamadoValido: boolean | null;
     branchOrigem: string;
     branchDestino: string;
     atualizadoEm: string;

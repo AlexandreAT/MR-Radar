@@ -103,7 +103,12 @@ export function ListaMergeRequests({
                         >
                             <LinhaTitulo>
                                 <TituloItem>{mergeRequest.titulo}</TituloItem>
-                                {mergeRequest.rascunho && <Etiqueta>{TEXTO_LISTA.RASCUNHO}</Etiqueta>}
+                                {mergeRequest.statusChamado && <Etiqueta tom={TomEtiqueta.EmAndamento}>{mergeRequest.statusChamado}</Etiqueta>}
+                                {mergeRequest.chamadoValido !== null && (
+                                    <Etiqueta tom={mergeRequest.chamadoValido ? TomEtiqueta.Resolvido : TomEtiqueta.Issue}>
+                                        {mergeRequest.chamadoValido ? TEXTO_LISTA.VALIDO : TEXTO_LISTA.INVALIDO}
+                                    </Etiqueta>
+                                )}
                                 {mergeRequest.temThreadsAbertas && <Etiqueta tom={TomEtiqueta.Aberto}>{TEXTO_LISTA.THREADS_ABERTAS}</Etiqueta>}
                             </LinhaTitulo>
                             <Detalhes>

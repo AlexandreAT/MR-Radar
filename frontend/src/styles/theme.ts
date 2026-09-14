@@ -15,6 +15,7 @@ export const tema = {
         primariaEscura: "#2f6fd8",
         aberto: "#f0a020",
         resolvido: "#3fb950",
+        emAndamento: "#8fe3b0",
         erro: "#f26d6d",
         fundoErro: "#3a1d1d",
         rotuloIssue: "#f2564b",

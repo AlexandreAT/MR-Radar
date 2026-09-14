@@ -80,7 +80,9 @@ export function ConverterPullRequestAberto(pullRequest: PullRequestGitHub, proje
         iid: pullRequest.number,
         titulo: pullRequest.title,
         url: pullRequest.html_url,
-        rascunho: pullRequest.draft ?? false,
+        // Status do chamado só existe para o GitLab, que tem o conceito de chamado vinculado.
+        statusChamado: null,
+        chamadoValido: null,
         branchOrigem: pullRequest.head?.ref ?? "",
         branchDestino: pullRequest.base?.ref ?? "",
         atualizadoEm: pullRequest.updated_at,

@@ -5,6 +5,7 @@ export enum TomEtiqueta {
     Neutro = "neutro",
     Aberto = "aberto",
     Resolvido = "resolvido",
+    EmAndamento = "em_andamento",
     Alerta = "alerta",
     Issue = "issue",
     Suggestion = "suggestion",

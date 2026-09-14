@@ -12,6 +12,7 @@ function getCor(tom: TomEtiqueta, theme: DefaultTheme): string {
         [TomEtiqueta.Neutro]: theme.cores.textoSecundario,
         [TomEtiqueta.Aberto]: theme.cores.aberto,
         [TomEtiqueta.Resolvido]: theme.cores.resolvido,
+        [TomEtiqueta.EmAndamento]: theme.cores.emAndamento,
         [TomEtiqueta.Alerta]: theme.cores.erro,
         [TomEtiqueta.Issue]: theme.cores.rotuloIssue,
         [TomEtiqueta.Suggestion]: theme.cores.rotuloSuggestion,
