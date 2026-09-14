@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { DiaDeHoras, HorasPorIssueNoDia } from "src/api/Horas/types";
+import { NOME_CURTO_DO_DIA } from "src/utils/DiasUteis";
 import { FormatarDiaMes, FormatarHoras, LimparTituloChamado } from "src/utils/Formatacao";
-import { BarraDia, DESENHO, EstadoDia, LinhaReferencia, NOME_CURTO_DO_DIA } from "./types";
+import { BarraDia, DESENHO, EstadoDia, LinhaReferencia } from "./types";
 
 /**
  * Calcula as coordenadas das barras e da linha de referência do gráfico, e controla qual barra

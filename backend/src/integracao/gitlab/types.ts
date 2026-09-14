@@ -17,6 +17,16 @@ export enum EscopoGitLab {
     Todos = "all",
 }
 
+/** Ação filtrada na consulta ao histórico de eventos do usuário. */
+export enum AcaoEventoGitLab {
+    Comentou = "commented",
+}
+
+/** Tipo do que recebeu o comentário de um evento. Só "Issue" interessa para comentário de status do chamado. */
+export enum TipoNoteableGitLab {
+    Issue = "Issue",
+}
+
 /** Campo em que a pesquisa por texto procura o termo. */
 export enum CampoDePesquisaGitLab {
     Titulo = "title",
@@ -204,6 +214,18 @@ export interface CommitGitLab {
     author_name: string;
     author_email: string | null;
     committed_date: string;
+}
+
+/** Nota associada a um evento do histórico de atividade do usuário. */
+export interface NotaDoEventoGitLab {
+    noteable_type: string;
+    system: boolean;
+}
+
+/** Evento do histórico de atividade do dono do token, filtrado por ação. */
+export interface EventoGitLab {
+    created_at: string;
+    note?: NotaDoEventoGitLab;
 }
 
 /** Tipo de item devolvido pela árvore do repositório. */

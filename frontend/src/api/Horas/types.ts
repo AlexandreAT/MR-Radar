@@ -21,6 +21,8 @@ export interface DiaDeHoras {
     completo: boolean;
     hoje: boolean;
     porIssue: HorasPorIssueNoDia[];
+    /** Indica se o dono do token deixou algum comentário (não de sistema) em um chamado neste dia. */
+    temComentario: boolean;
 }
 
 /** Issue do usuário com as horas que ele lançou na semana consultada. */

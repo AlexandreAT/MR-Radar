@@ -14,15 +14,6 @@ export const TEXTO_GRAFICO = {
     SEM_LANCAMENTOS: "Sem lançamentos",
 } as const;
 
-/** Nome curto exibido embaixo de cada barra. */
-export const NOME_CURTO_DO_DIA: Record<string, string> = {
-    segunda: "SEG",
-    terca: "TER",
-    quarta: "QUA",
-    quinta: "QUI",
-    sexta: "SEX",
-};
-
 /** Medidas do desenho, em unidades do viewBox. */
 export const DESENHO = {
     LARGURA: 360,
@@ -30,11 +21,15 @@ export const DESENHO = {
     MARGEM_LATERAL: 16,
     LARGURA_BARRA: 46,
     ESPACO_ENTRE_BARRAS: 24,
-    TOPO_AREA: 22,
+    // Deixa uma folga acima da barra mais alta possível (quando o dia bate a meta, ela encosta na
+    // linha de referência): sem essa folga, o rótulo da barra e o rótulo da linha de referência
+    // ficam colados um no outro quando o último dia da semana bate a meta.
+    TOPO_AREA: 34,
     BASE_AREA: 168,
     ALTURA_MINIMA_BARRA: 3,
     RAIO_BARRA: 4,
     ALTURA_ROTULO_VALOR: 8,
+    LINHA_ROTULO_ESPERADO: 12,
     LINHA_NOME_DIA: 187,
     LINHA_DATA: 203,
 } as const;

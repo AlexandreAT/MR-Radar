@@ -1,4 +1,5 @@
-import styled from "styled-components";
+import styled, { css } from "styled-components";
+import { AlinhamentoDica } from "./types";
 
 export const Container = styled.span`
     position: relative;
@@ -7,11 +8,23 @@ export const Container = styled.span`
     cursor: pointer;
 `;
 
-export const Bolha = styled.span`
+/** Posição horizontal da dica, conforme o alinhamento pedido — evita cortar na borda da tela. */
+const POSICAO_POR_ALINHAMENTO = {
+    [AlinhamentoDica.Centro]: css`
+        left: 50%;
+        transform: translateX(-50%);
+    `,
+    [AlinhamentoDica.Esquerda]: css`
+        left: 0;
+    `,
+    [AlinhamentoDica.Direita]: css`
+        right: 0;
+    `,
+};
+
+export const Bolha = styled.span<{ $alinhamento: AlinhamentoDica }>`
     position: absolute;
     bottom: calc(100% + 6px);
-    left: 50%;
-    transform: translateX(-50%);
     z-index: 2;
     padding: 6px 8px;
     border: 1px solid ${({ theme }) => theme.cores.borda};
@@ -23,4 +36,5 @@ export const Bolha = styled.span`
     white-space: nowrap;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
     pointer-events: none;
+    ${({ $alinhamento }) => POSICAO_POR_ALINHAMENTO[$alinhamento]}
 `;

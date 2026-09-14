@@ -1,6 +1,7 @@
 import { Botao, Etiqueta, TomEtiqueta } from "src/components/BasicComponents";
 import { GraficoHoras } from "src/components/Horas/GraficoHoras";
 import { ListaIssuesHoras } from "src/components/Horas/ListaIssuesHoras";
+import { ResumoComentariosSemana } from "src/components/Horas/ResumoComentariosSemana";
 import { FormatarHoras } from "src/utils/Formatacao";
 import {
     BlocoTitulo,
@@ -95,6 +96,8 @@ export function PainelHoras({ configuracao }: PropriedadesPainelHoras) {
                         diaSelecionado={diaSelecionado}
                         onSelecionarDia={handleSelecionarDia}
                     />
+
+                    <ResumoComentariosSemana horasPorDia={resumo.horasPorDia} />
                 </Painel>
             )}
 

@@ -46,7 +46,7 @@ export function GraficoHoras({ horasPorDia, horasPorDiaEsperadas, diaSelecionado
                 ))}
 
                 <LinhaEsperada x1={DESENHO.MARGEM_LATERAL} y1={referencia.y} x2={DESENHO.LARGURA - DESENHO.MARGEM_LATERAL} y2={referencia.y} />
-                <RotuloEsperado x={DESENHO.LARGURA - DESENHO.MARGEM_LATERAL} y={referencia.y - 4}>
+                <RotuloEsperado x={DESENHO.LARGURA - DESENHO.MARGEM_LATERAL} y={DESENHO.LINHA_ROTULO_ESPERADO}>
                     {referencia.texto}
                 </RotuloEsperado>
 

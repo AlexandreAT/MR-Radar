@@ -1,7 +1,7 @@
 import { ConfiguracaoApp } from "../configuracao/types";
 import { CodigoErroProvedor, ErroProvedor } from "../integracao/ErroProvedor";
 import { ClienteGitLab } from "../integracao/gitlab/ClienteGitLab";
-import { CommitGitLab, IssueGitLab, MergeRequestRelacionadoGitLab, NotaGitLab, UsuarioGitLab } from "../integracao/gitlab/types";
+import { CommitGitLab, EventoGitLab, IssueGitLab, MergeRequestRelacionadoGitLab, NotaGitLab, TipoNoteableGitLab, UsuarioGitLab } from "../integracao/gitlab/types";
 import { PaginaResultado } from "../integracao/types";
 import { DiaDeHoras, DiaUtil, HorasPorIssueNoDia, IssueComHoras, ParametrosConsultaHoras, ResumoHorasSemana } from "../models/Horas/types";
 import { MapearComLimite } from "../utilidades/Colecoes";
@@ -81,14 +81,15 @@ export class LogicaHoras {
             this.cliente.GetIssuesAtribuidas(SomarDias(inicioSemana, -FOLGA_EM_DIAS) + INICIO_DO_DIA_UTC),
         ]);
 
-        // Horas e elegibilidade vêm de chamadas independentes à API — rodam em paralelo e só se
-        // encontram na conversão final de cada issue.
-        const [horasDasIssues, elegibilidade] = await Promise.all([
+        // Horas, elegibilidade e comentários vêm de chamadas independentes à API — rodam em
+        // paralelo e só se encontram na montagem final da semana.
+        const [horasDasIssues, elegibilidade, diasComComentario] = await Promise.all([
             this.getHorasDasIssues(paginaIssues.itens, usuario, inicioSemana, fimSemana, fimDeSemana),
             this.getElegibilidadeDasIssues(paginaIssues.itens, usuario, inicioSemana, fimDeSemana),
+            this.getDiasComComentario(inicioSemana, fimSemana),
         ]);
 
-        const horasPorDia: DiaDeHoras[] = montarDiasUteis(inicioSemana, horasDasIssues);
+        const horasPorDia: DiaDeHoras[] = montarDiasUteis(inicioSemana, horasDasIssues, diasComComentario.dias);
         const horasLancadas: number = arredondar(horasPorDia.reduce((total, dia) => total + dia.horas, 0));
         const horasEsperadas: number = HORAS_POR_DIA_UTIL * DIAS_UTEIS_POR_SEMANA;
 
@@ -108,7 +109,7 @@ export class LogicaHoras {
                 .map((item) => converterIssue(item.issue, item.horasNaSemana, elegibilidade.porIssue.get(getChaveIssue(item.issue.project_id, item.issue.iid)) ?? []))
                 .sort(compararIssues),
             consultadoEm: new Date().toISOString(),
-            paginacaoTruncada: paginaIssues.truncada || horasDasIssues.some((item) => item.paginacaoTruncada) || elegibilidade.paginacaoTruncada,
+            paginacaoTruncada: paginaIssues.truncada || horasDasIssues.some((item) => item.paginacaoTruncada) || elegibilidade.paginacaoTruncada || diasComComentario.truncada,
         };
     }
 
@@ -212,6 +213,27 @@ export class LogicaHoras {
 
         return { porIssue: new Map(pares), paginacaoTruncada };
     }
+
+    /**
+     * Descobre em quais dias úteis da semana o dono do token comentou em algum chamado (issue) —
+     * um comentário de verdade (não de sistema), em qualquer projeto que o token enxergue.
+     * Vem do histórico de atividade do usuário, então não precisa percorrer chamado por chamado
+     * procurando comentário.
+     * @param inicioSemana Segunda-feira da semana consultada.
+     * @param fimSemana Sexta-feira da semana consultada.
+     * @returns Dias com comentário, e indicação de paginação truncada.
+     */
+    private async getDiasComComentario(inicioSemana: string, fimSemana: string): Promise<{ dias: Set<string>; truncada: boolean }> {
+        const apos: string = SomarDias(inicioSemana, -MARGEM_FUSO_EM_DIAS);
+        const pagina: PaginaResultado<EventoGitLab> = await this.cliente.GetEventosDeComentario(apos);
+
+        const dias: string[] = pagina.itens
+            .filter((evento) => evento.note?.noteable_type === TipoNoteableGitLab.Issue && !evento.note.system)
+            .map((evento) => GetDataLocal(new Date(evento.created_at)))
+            .filter((data) => data >= inicioSemana && data <= fimSemana);
+
+        return { dias: new Set(dias), truncada: pagina.truncada };
+    }
 }
 
 /**
@@ -248,9 +270,10 @@ function getLancamentosDoUsuario(notas: NotaGitLab[], idDoUsuario: number): Lanc
  * Monta os cinco dias úteis da semana com as horas lançadas em cada um, e o detalhe por issue.
  * @param inicioSemana Segunda-feira da semana consultada.
  * @param horasDasIssues Lançamentos já separados por issue.
+ * @param diasComComentario Dias em que o dono do token comentou em algum chamado.
  * @returns Dias de segunda a sexta, na ordem do calendário.
  */
-function montarDiasUteis(inicioSemana: string, horasDasIssues: HorasDaIssue[]): DiaDeHoras[] {
+function montarDiasUteis(inicioSemana: string, horasDasIssues: HorasDaIssue[], diasComComentario: Set<string>): DiaDeHoras[] {
     const hoje: string = GetDataDeHoje();
     const lancamentosComTitulo: (LancamentoDeTempo & { titulo: string })[] = horasDasIssues.flatMap((item) =>
         item.lancamentos.map((lancamento) => ({ ...lancamento, titulo: item.issue.title })),
@@ -271,6 +294,7 @@ function montarDiasUteis(inicioSemana: string, horasDasIssues: HorasDaIssue[]): 
             completo: horas >= HORAS_POR_DIA_UTIL,
             hoje: data === hoje,
             porIssue: agruparPorIssue(doDia),
+            temComentario: diasComComentario.has(data),
         };
     });
 }

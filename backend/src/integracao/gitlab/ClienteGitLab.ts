@@ -9,6 +9,7 @@ import { ExecutarGet, RespostaHttp } from "../http/ExecutarGet";
 import { PaginaResultado } from "../types";
 import { ConverterArquivoAlterado, ConverterMergeRequest, ConverterMergeRequestAberto, NormalizarDiscussoes } from "./ConversorGitLab";
 import {
+    AcaoEventoGitLab,
     API_GITLAB,
     CabecalhoGitLab,
     CampoDePesquisaGitLab,
@@ -19,6 +20,7 @@ import {
     EscopoGitLab,
     EstadoIssueGitLab,
     EstadoMergeRequestGitLab,
+    EventoGitLab,
     IssueGitLab,
     ItemArvoreGitLab,
     MergeRequestGitLab,
@@ -175,6 +177,20 @@ export class ClienteGitLab implements ClienteRevisao {
      */
     public async GetUsuarioAtual(): Promise<UsuarioGitLab> {
         return this.getJson<UsuarioGitLab>("/user");
+    }
+
+    /**
+     * Lista os comentários que o dono do token deixou a partir de uma data, em qualquer projeto.
+     * Vem do histórico de atividade do usuário — dá para saber em que dias ele comentou sem
+     * precisar percorrer as issues uma a uma.
+     * @param apos Data (AAAA-MM-DD) a partir da qual os comentários interessam.
+     * @returns Eventos de comentário encontrados e indicação de paginação truncada.
+     */
+    public async GetEventosDeComentario(apos: string): Promise<PaginaResultado<EventoGitLab>> {
+        return this.getTodasPaginas<EventoGitLab>("/events", {
+            action: AcaoEventoGitLab.Comentou,
+            after: apos,
+        });
     }
 
     /**
