@@ -24,17 +24,35 @@ const MOTIVO_DIFF_INDISPONIVEL = "Arquivo grande demais para exibir aqui — abr
 /** Separador entre o caminho do projeto e o IID na referência do GitLab. */
 const SEPARADOR_REFERENCIA = "!";
 
-/** Tag de cada status conhecido do quadro, na grafia exata usada nele. */
-const STATUS_CHAMADO_POR_TAG: Record<string, StatusChamado> = {
-    Started: StatusChamado.Started,
-    Testing: StatusChamado.Testing,
-    "Ready for development": StatusChamado.ReadyForDevelopment,
-    Revision: StatusChamado.Revision,
+/**
+ * Tag de cada status conhecido do quadro, já normalizada — o quadro tem tags digitadas por
+ * pessoas diferentes, então a mesma tag aparece com e sem acento em chamados diferentes (ex.:
+ * "Válido" e "Valido", confirmado em chamados reais). A comparação ignora acento e maiúscula.
+ */
+const STATUS_CHAMADO_POR_TAG_NORMALIZADA: Record<string, StatusChamado> = {
+    started: StatusChamado.Started,
+    testing: StatusChamado.Testing,
+    "ready for development": StatusChamado.ReadyForDevelopment,
+    revision: StatusChamado.Revision,
 };
 
-/** Tags de validade do chamado, na grafia exata usada no quadro. */
-const TAG_CHAMADO_VALIDO = "Válido";
-const TAG_CHAMADO_INVALIDO = "Inválido";
+/** Tags de validade do chamado, já normalizadas (ver STATUS_CHAMADO_POR_TAG_NORMALIZADA). */
+const TAG_CHAMADO_VALIDO_NORMALIZADA = "valido";
+const TAG_CHAMADO_INVALIDO_NORMALIZADA = "invalido";
+
+/**
+ * Remove acentuação e normaliza maiúsculas/minúsculas de uma tag do GitLab, para reconhecer a
+ * mesma tag digitada de formas diferentes no quadro.
+ * @param tag Tag como veio da API.
+ * @returns Tag em minúsculas e sem acento.
+ */
+function normalizarTag(tag: string): string {
+    return tag
+        .normalize("NFD")
+        .replace(/[̀-ͯ]/g, "")
+        .trim()
+        .toLowerCase();
+}
 
 /**
  * Nome de usuário que o próprio GitLab gera para bots de Project/Group Access Token,
@@ -267,8 +285,13 @@ export function InterpretarStatusChamado(labels: string[] | null): StatusDoChama
     if (!labels)
         return { statusChamado: null, chamadoValido: null };
 
-    const statusChamado: StatusChamado | null = labels.map((label) => STATUS_CHAMADO_POR_TAG[label]).find((status) => status !== undefined) ?? null;
-    const chamadoValido: boolean | null = labels.includes(TAG_CHAMADO_VALIDO) ? true : labels.includes(TAG_CHAMADO_INVALIDO) ? false : null;
+    const labelsNormalizadas: string[] = labels.map(normalizarTag);
+    const statusChamado: StatusChamado | null = labelsNormalizadas.map((label) => STATUS_CHAMADO_POR_TAG_NORMALIZADA[label]).find((status) => status !== undefined) ?? null;
+    const chamadoValido: boolean | null = labelsNormalizadas.includes(TAG_CHAMADO_VALIDO_NORMALIZADA)
+        ? true
+        : labelsNormalizadas.includes(TAG_CHAMADO_INVALIDO_NORMALIZADA)
+          ? false
+          : null;
 
     return { statusChamado, chamadoValido };
 }
