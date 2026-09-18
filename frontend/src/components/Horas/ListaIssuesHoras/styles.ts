@@ -65,19 +65,31 @@ export const Horas = styled.div`
     gap: ${({ theme }) => theme.espacamentos.pequeno};
 `;
 
-export const PontoElegibilidade = styled.span<{ $nivel: NivelElegibilidade }>`
+/**
+ * Brilho sutil em volta do marcador e do texto de horas do dia de referência — só a issue que já
+ * recebeu horas no dia (hoje ou o clicado no gráfico) ganha o efeito, as demais ficam sem glow.
+ * @param theme Tema da aplicação.
+ * @returns Sombra usada como glow verde.
+ */
+function getGlow(theme: DefaultTheme): string {
+    return `0 0 3px ${theme.cores.resolvido}80`;
+}
+
+export const PontoElegibilidade = styled.span<{ $nivel: NivelElegibilidade; $destaque: boolean }>`
     display: inline-block;
     width: 7px;
     height: 7px;
     border-radius: 50%;
     background: ${({ $nivel, theme }) => getCorElegibilidade($nivel, theme)};
+    box-shadow: ${({ $destaque, theme }) => ($destaque ? getGlow(theme) : "none")};
 `;
 
-export const HorasNaSemana = styled.span<{ $temHoras: boolean }>`
+export const HorasNaSemana = styled.span<{ $temHoras: boolean; $destaque: boolean }>`
     color: ${({ $temHoras, theme }) => ($temHoras ? theme.cores.resolvido : theme.cores.textoSecundario)};
     font-size: 13px;
     font-weight: 700;
     white-space: nowrap;
+    text-shadow: ${({ $destaque, theme }) => ($destaque ? getGlow(theme) : "none")};
 `;
 
 export const HorasTotais = styled.span`

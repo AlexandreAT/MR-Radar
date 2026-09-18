@@ -1,6 +1,6 @@
 import { Etiqueta } from "src/components/BasicComponents";
 import { DicaHover } from "src/components/BasicComponents/DicaHover";
-import { GetMarcadorElegibilidade, MarcadorElegibilidade } from "src/utils/Elegibilidade";
+import { GetMarcadorElegibilidade, MarcadorElegibilidade, NivelElegibilidade } from "src/utils/Elegibilidade";
 import { FormatarDataHora, FormatarHoras } from "src/utils/Formatacao";
 import {
     Aviso,
@@ -31,6 +31,7 @@ export function ListaIssuesHoras({ issues, diaReferencia, ehHoje }: Propriedades
                 <Lista>
                     {issues.map((issue) => {
                         const marcador: MarcadorElegibilidade | null = GetMarcadorElegibilidade(issue.diasComCommit, diaReferencia, ehHoje);
+                        const destaque: boolean = marcador?.nivel === NivelElegibilidade.CommitouNoDiaDeReferencia;
 
                         return (
                             <Item key={`${issue.projetoId}-${issue.iid}`} href={issue.url} target="_blank" rel="noreferrer">
@@ -40,10 +41,10 @@ export function ListaIssuesHoras({ issues, diaReferencia, ehHoje }: Propriedades
                                         {issue.estado === ESTADO_FECHADO && <Etiqueta>{ROTULO_FECHADO}</Etiqueta>}
                                         {marcador && (
                                             <DicaHover texto={marcador.texto}>
-                                                <PontoElegibilidade $nivel={marcador.nivel} />
+                                                <PontoElegibilidade $nivel={marcador.nivel} $destaque={destaque} />
                                             </DicaHover>
                                         )}
-                                        <HorasNaSemana $temHoras={issue.horasNaSemana > 0}>
+                                        <HorasNaSemana $temHoras={issue.horasNaSemana > 0} $destaque={destaque}>
                                             {FormatarHoras(issue.horasNaSemana)} {TEXTO_LISTA_ISSUES.NA_SEMANA}
                                         </HorasNaSemana>
                                         <HorasTotais>
