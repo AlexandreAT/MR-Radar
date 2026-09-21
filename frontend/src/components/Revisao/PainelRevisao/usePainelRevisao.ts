@@ -1,16 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { BuscarMergeRequests, GetComentariosRevisao, GetMeusMergeRequests } from "src/api/Revisao";
-import {
-    CodigoErroBackend,
-    CodigoErroTrecho,
-    ComentarioRevisao,
-    ConfiguracaoDashboard,
-    EscopoMergeRequest,
-    ListaMergeRequestsAbertos,
-    MergeRequestAberto,
-    RevisaoMergeRequest,
-    StatusFiltro,
-} from "src/api/Revisao/types";
+import { GetComentariosRevisao } from "src/api/Revisao";
+import { CodigoErroBackend, CodigoErroTrecho, ComentarioRevisao, ConfiguracaoDashboard, MergeRequestAberto, RevisaoMergeRequest, StatusFiltro } from "src/api/Revisao/types";
 import { ConverterErro, EhCancelamento } from "src/services";
 import { CODIGO_ERRO_COMUNICACAO, MensagemErro } from "src/services/types";
 import { AvisarAvisos, AvisarSeProblemaDeToken } from "src/utils/AvisoToken";
@@ -38,13 +28,14 @@ import {
     MILISSEGUNDOS_POR_SEGUNDO,
     OpcoesBusca,
     TEMPO_RETORNO_COPIA_MS,
-    TERMO_PESQUISA_MIN_CARACTERES,
 } from "./types";
 
 /**
- * Concentra o estado e as consultas da tela de revisão.
+ * Concentra o estado e as consultas da tela de revisão. A lista de Merge Requests (abertos e
+ * encerrados) é responsabilidade própria de ListaMergeRequests — este hook cuida só da consulta
+ * de comentários do Merge Request escolhido.
  * @param configuracao Configuração do backend, já carregada pelo aplicativo.
- * @returns Estado da tela, Merge Requests do usuário, comentários e os manipuladores usados pelos componentes.
+ * @returns Estado da tela, comentários e os manipuladores usados pelos componentes.
  */
 export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
     const [projetoId, setProjetoId] = useState<string>(() => GetPreferencia(ChavePreferencia.ProjetoId));
@@ -64,27 +55,10 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
     const [ultimaAtualizacao, setUltimaAtualizacao] = useState<string>("");
     const [estadoCopia, setEstadoCopia] = useState<EstadoCopia>(EstadoCopia.Ocioso);
 
-    const [escopo, setEscopo] = useState<EscopoMergeRequest>(EscopoMergeRequest.CriadosPorMim);
-    const [meusMergeRequests, setMeusMergeRequests] = useState<MergeRequestAberto[]>([]);
-    const [listaTruncada, setListaTruncada] = useState<boolean>(false);
-    const [carregandoLista, setCarregandoLista] = useState<boolean>(false);
-    const [erroLista, setErroLista] = useState<MensagemErro | null>(null);
-
-    // resultadosPesquisa nulo é "sem pesquisa ativa": a lista mostrada volta a ser a de escopo.
-    const [termoPesquisa, setTermoPesquisa] = useState<string>("");
-    const [resultadosPesquisa, setResultadosPesquisa] = useState<MergeRequestAberto[] | null>(null);
-    const [pesquisaTruncada, setPesquisaTruncada] = useState<boolean>(false);
-    const [pesquisando, setPesquisando] = useState<boolean>(false);
-    const [erroPesquisa, setErroPesquisa] = useState<MensagemErro | null>(null);
-
     const requisicaoEmAndamento = useRef<AbortController | null>(null);
-    const requisicaoDaLista = useRef<AbortController | null>(null);
-    const requisicaoDaPesquisa = useRef<AbortController | null>(null);
     const temporizadorCopia = useRef<number | null>(null);
 
     const podeBuscar: boolean = useMemo(() => Boolean(projetoId.trim() && mrIid.trim()), [projetoId, mrIid]);
-    const podePesquisar: boolean = useMemo(() => termoPesquisa.trim().length >= TERMO_PESQUISA_MIN_CARACTERES, [termoPesquisa]);
-    const configuracaoValida: boolean = Boolean(configuracao && configuracao.problemas.length === 0);
     const vocabulario: Vocabulario = GetVocabulario(configuracao?.provedor);
     const mensagens: MensagensDoProvedor = GetMensagensDoProvedor(vocabulario);
 
@@ -101,51 +75,12 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
     useEffect(
         () => () => {
             requisicaoEmAndamento.current?.abort();
-            requisicaoDaLista.current?.abort();
-            requisicaoDaPesquisa.current?.abort();
 
             if (temporizadorCopia.current)
                 window.clearTimeout(temporizadorCopia.current);
         },
         [],
     );
-
-    const carregarMeusMergeRequests = useCallback(async () => {
-        // Sem .env preenchido a consulta falharia de qualquer jeito, e o painel de configuração já avisa o motivo.
-        if (!configuracaoValida)
-            return;
-
-        requisicaoDaLista.current?.abort();
-        const controlador = new AbortController();
-        requisicaoDaLista.current = controlador;
-        setCarregandoLista(true);
-
-        try {
-            const lista: ListaMergeRequestsAbertos = await GetMeusMergeRequests(escopo, controlador.signal);
-
-            setMeusMergeRequests(lista.mergeRequests);
-            setListaTruncada(lista.paginacaoTruncada);
-            setErroLista(null);
-        } catch (falha: unknown) {
-            if (EhCancelamento(falha))
-                return;
-
-            const mensagemErro: MensagemErro = ConverterErro(falha, mensagens.ERRO_LISTA);
-
-            setMeusMergeRequests([]);
-            setErroLista(mensagemErro);
-            AvisarSeProblemaDeToken(mensagemErro, "Lista de Merge Requests");
-        } finally {
-            if (requisicaoDaLista.current === controlador) {
-                requisicaoDaLista.current = null;
-                setCarregandoLista(false);
-            }
-        }
-    }, [configuracaoValida, escopo]);
-
-    useEffect(() => {
-        void carregarMeusMergeRequests();
-    }, [carregarMeusMergeRequests]);
 
     const buscar = useCallback(
         async (opcoes: OpcoesBusca = {}) => {
@@ -323,77 +258,6 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
     }
 
     /**
-     * Troca de quem são os Merge Requests listados.
-     * @param valor Valor devolvido pelo campo.
-     * @returns Nada.
-     */
-    function handleAlterarEscopo(valor: string): void {
-        setEscopo(valor as EscopoMergeRequest);
-    }
-
-    /**
-     * Recarrega a lista de Merge Requests do usuário.
-     * @returns Nada.
-     */
-    function handleAtualizarLista(): void {
-        void carregarMeusMergeRequests();
-    }
-
-    /**
-     * Atualiza o termo pesquisado. Esvaziar o campo volta a mostrar a lista por escopo na hora,
-     * sem precisar de um botão de limpar à parte.
-     * @param valor Texto digitado no campo de pesquisa.
-     * @returns Nada.
-     */
-    function handleAlterarTermoPesquisa(valor: string): void {
-        setTermoPesquisa(valor);
-
-        if (!valor.trim()) {
-            requisicaoDaPesquisa.current?.abort();
-            setResultadosPesquisa(null);
-            setErroPesquisa(null);
-        }
-    }
-
-    /**
-     * Pesquisa Merge Requests pelo título, entre todos os que o token enxerga.
-     * @returns Nada.
-     */
-    async function handlePesquisar(): Promise<void> {
-        const termo: string = termoPesquisa.trim();
-
-        if (termo.length < TERMO_PESQUISA_MIN_CARACTERES)
-            return;
-
-        requisicaoDaPesquisa.current?.abort();
-        const controlador = new AbortController();
-        requisicaoDaPesquisa.current = controlador;
-        setPesquisando(true);
-
-        try {
-            const resultado = await BuscarMergeRequests(termo, controlador.signal);
-
-            setResultadosPesquisa(resultado.mergeRequests);
-            setPesquisaTruncada(resultado.paginacaoTruncada);
-            setErroPesquisa(null);
-        } catch (falha: unknown) {
-            if (EhCancelamento(falha))
-                return;
-
-            const mensagemErro: MensagemErro = ConverterErro(falha, MENSAGEM.ERRO_PESQUISA);
-
-            setResultadosPesquisa(null);
-            setErroPesquisa(mensagemErro);
-            AvisarSeProblemaDeToken(mensagemErro, "Pesquisa de Merge Requests");
-        } finally {
-            if (requisicaoDaPesquisa.current === controlador) {
-                requisicaoDaPesquisa.current = null;
-                setPesquisando(false);
-            }
-        }
-    }
-
-    /**
      * Dispara a consulta a partir dos botões e da tecla Enter.
      * @returns Nada.
      */
@@ -439,26 +303,11 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
         comentarios,
         textoContador: montarTextoContador(comentarios.length),
         estadoCopia,
-        escopo,
-        meusMergeRequests,
-        listaTruncada,
-        carregandoLista,
-        erroLista,
-        termoPesquisa,
-        podePesquisar,
-        resultadosPesquisa,
-        pesquisaTruncada,
-        pesquisando,
-        erroPesquisa,
         handleAlterarProjeto,
         handleAlterarStatus,
         handleAlterarSituacao,
         handleAlterarOrdenacao,
         handleAlterarIntervalo,
-        handleAlterarEscopo,
-        handleAtualizarLista,
-        handleAlterarTermoPesquisa,
-        handlePesquisar,
         handleSelecionarMergeRequest,
         handleBuscar,
         handleCopiarComentarios,
@@ -476,4 +325,3 @@ export function usePainelRevisao(configuracao: ConfiguracaoDashboard | null) {
 function montarTextoContador(quantidade: number): string {
     return `${quantidade} ${quantidade === 1 ? MENSAGEM.CONTADOR_EXIBIDO : MENSAGEM.CONTADOR_EXIBIDOS}`;
 }
-

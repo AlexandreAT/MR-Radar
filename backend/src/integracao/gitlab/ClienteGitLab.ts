@@ -2,12 +2,12 @@ import { OutgoingHttpHeaders } from "http";
 import { ConfiguracaoApp, LIMITE } from "../../configuracao/types";
 import { DiscussaoNormalizada } from "../../logica/types";
 import { EscopoMergeRequest, MergeRequestAberto, MergeRequestResumo, PaginaArquivosAlterados } from "../../models/Revisao/types";
-import { MapearComLimite } from "../../utilidades/Colecoes";
+import { MapearComLimite, PaginarLista } from "../../utilidades/Colecoes";
 import { StatusHttp } from "../../utilidades/types";
 import { ClienteRevisao } from "../ClienteRevisao";
 import { CodigoErroProvedor, ErroProvedor } from "../ErroProvedor";
 import { ExecutarGet, RespostaHttp } from "../http/ExecutarGet";
-import { PaginaResultado } from "../types";
+import { PaginaNumerada, PaginaResultado } from "../types";
 import { ConverterArquivoAlterado, ConverterMergeRequest, ConverterMergeRequestAberto, InterpretarStatusChamado, NormalizarDiscussoes } from "./ConversorGitLab";
 import {
     AcaoEventoGitLab,
@@ -99,6 +99,34 @@ export class ClienteGitLab implements ClienteRevisao {
         const mergeRequests: MergeRequestAberto[] = await this.enriquecerComStatusChamado(pagina.itens.map(ConverterMergeRequestAberto));
 
         return { itens: mergeRequests, truncada: pagina.truncada };
+    }
+
+    /**
+     * Lista os Merge Requests encerrados (fechados ou mesclados) do usuário, com paginação real.
+     * @param escopo Se a lista traz os criados por ele ou os atribuídos a ele.
+     * @param pagina Página pedida, a partir de 1.
+     * @returns Página de Merge Requests encerrados, do mais recente para o mais antigo.
+     */
+    public async GetMergeRequestsEncerrados(escopo: EscopoMergeRequest, pagina: number): Promise<PaginaNumerada<MergeRequestAberto>> {
+        const todos: PaginaResultado<MergeRequestListaGitLab> = await this.getTodosEncerrados({ scope: ESCOPO_GITLAB[escopo] });
+
+        return this.montarPaginaDeEncerrados(todos, pagina);
+    }
+
+    /**
+     * Pesquisa Merge Requests encerrados (fechados ou mesclados) pelo título, com paginação real.
+     * @param termo Texto pesquisado no título.
+     * @param pagina Página pedida, a partir de 1.
+     * @returns Página de Merge Requests encontrados, do mais recente para o mais antigo.
+     */
+    public async BuscarMergeRequestsEncerrados(termo: string, pagina: number): Promise<PaginaNumerada<MergeRequestAberto>> {
+        const todos: PaginaResultado<MergeRequestListaGitLab> = await this.getTodosEncerrados({
+            scope: EscopoGitLab.Todos,
+            search: termo,
+            in: CampoDePesquisaGitLab.Titulo,
+        });
+
+        return this.montarPaginaDeEncerrados(todos, pagina);
     }
 
     /**
@@ -281,6 +309,39 @@ export class ClienteGitLab implements ClienteRevisao {
 
             pagina = proximaPagina;
         }
+    }
+
+    /**
+     * Coleta todos os Merge Requests fechados e mesclados que casam com o filtro, já ordenados do
+     * mais recente para o mais antigo.
+     *
+     * O GitLab não tem um único valor de "state" para "não aberto": "closed" e "merged" são
+     * estados diferentes, então a coleta faz as duas consultas em paralelo e junta o resultado.
+     * @param parametrosComuns Filtros aplicados às duas consultas (escopo, pesquisa por título etc.).
+     * @returns Merge Requests fechados e mesclados juntos, e se algum dos dois foi truncado.
+     */
+    private async getTodosEncerrados(parametrosComuns: Record<string, string>): Promise<PaginaResultado<MergeRequestListaGitLab>> {
+        const [fechados, mesclados] = await Promise.all([
+            this.getTodasPaginas<MergeRequestListaGitLab>("/merge_requests", { ...parametrosComuns, state: EstadoMergeRequestGitLab.Fechado, order_by: "updated_at", sort: "desc" }),
+            this.getTodasPaginas<MergeRequestListaGitLab>("/merge_requests", { ...parametrosComuns, state: EstadoMergeRequestGitLab.Mesclado, order_by: "updated_at", sort: "desc" }),
+        ]);
+        const itens: MergeRequestListaGitLab[] = [...fechados.itens, ...mesclados.itens].sort((primeiro, segundo) => segundo.updated_at.localeCompare(primeiro.updated_at));
+
+        return { itens, truncada: fechados.truncada || mesclados.truncada };
+    }
+
+    /**
+     * Recorta a página pedida de Merge Requests encerrados e só então converte e enriquece esses
+     * itens — nunca os que ficaram fora da página, para não gastar chamadas à toa.
+     * @param todos Merge Requests fechados e mesclados já coletados e ordenados.
+     * @param pagina Página pedida, a partir de 1.
+     * @returns Página pronta, no formato de domínio.
+     */
+    private async montarPaginaDeEncerrados(todos: PaginaResultado<MergeRequestListaGitLab>, pagina: number): Promise<PaginaNumerada<MergeRequestAberto>> {
+        const recorte = PaginarLista(todos.itens, pagina, LIMITE.MERGE_REQUESTS_ENCERRADOS_POR_PAGINA);
+        const itens: MergeRequestAberto[] = await this.enriquecerComStatusChamado(recorte.itens.map(ConverterMergeRequestAberto));
+
+        return { itens, pagina: recorte.pagina, totalPaginas: recorte.totalPaginas, totalItens: todos.itens.length, truncada: todos.truncada };
     }
 
     /**

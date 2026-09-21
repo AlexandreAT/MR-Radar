@@ -17,9 +17,6 @@ export const INTERVALO_PADRAO_SEGUNDOS = 30;
 /** Fator de conversão do intervalo escolhido na tela para o temporizador. */
 export const MILISSEGUNDOS_POR_SEGUNDO = 1000;
 
-/** Caracteres mínimos para pesquisar por título. Espelha LIMITE.TERMO_PESQUISA_MIN_CARACTERES do backend. */
-export const TERMO_PESQUISA_MIN_CARACTERES = 3;
-
 /**
  * Erros que não se resolvem sozinhos: quando um deles acontece durante a atualização
  * automática, ela é desligada para não ficar repetindo uma consulta que vai falhar de novo.

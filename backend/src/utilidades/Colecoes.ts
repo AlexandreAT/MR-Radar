@@ -30,3 +30,26 @@ export async function MapearComLimite<TEntrada, TSaida>(itens: TEntrada[], limit
 
     return resultados;
 }
+
+/** Página recortada de uma lista já ordenada, com a página realmente usada e o total de páginas. */
+export interface PaginaRecortada<T> {
+    itens: T[];
+    /** Página realmente usada — a pedida, ou a última válida quando a pedida estourava o total. */
+    pagina: number;
+    totalPaginas: number;
+}
+
+/**
+ * Recorta a página pedida de uma lista já ordenada, com paginação de tamanho fixo.
+ * @param itens Lista completa, já ordenada.
+ * @param pagina Página pedida, a partir de 1.
+ * @param tamanho Quantidade de itens por página.
+ * @returns Itens da página realmente usada (a mais próxima, se a pedida estourar o total) e o total de páginas.
+ */
+export function PaginarLista<T>(itens: T[], pagina: number, tamanho: number): PaginaRecortada<T> {
+    const totalPaginas: number = Math.max(1, Math.ceil(itens.length / tamanho));
+    const paginaValida: number = Math.min(Math.max(1, pagina), totalPaginas);
+    const inicio: number = (paginaValida - 1) * tamanho;
+
+    return { itens: itens.slice(inicio, inicio + tamanho), pagina: paginaValida, totalPaginas };
+}

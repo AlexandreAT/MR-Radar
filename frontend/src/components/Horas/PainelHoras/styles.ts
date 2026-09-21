@@ -1,9 +1,16 @@
 import styled from "styled-components";
-import { PainelBase } from "../../sharedStyles";
+import { AreaRelativa, PainelBase } from "../../sharedStyles";
 
 export { CaixaAviso, CaixaErro, DicaErro, Pagina, TextoAviso, TextoErro, Vazio } from "../../sharedStyles";
 
 export const Painel = styled(PainelBase)`
+    display: flex;
+    flex-direction: column;
+    gap: ${({ theme }) => theme.espacamentos.medio};
+`;
+
+/** AreaRelativa com a mesma pilha vertical de Pagina — âncora do Carregando sem perder o espaçamento. */
+export const AreaConteudo = styled(AreaRelativa)`
     display: flex;
     flex-direction: column;
     gap: ${({ theme }) => theme.espacamentos.medio};

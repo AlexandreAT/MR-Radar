@@ -1,5 +1,6 @@
-import { Botao, VarianteBotao } from "src/components/BasicComponents";
+import { Botao, Carregando, VarianteBotao } from "src/components/BasicComponents";
 import { BlocoDiffArquivo } from "src/components/Revisao/BlocoDiffArquivo";
+import { AreaRelativa } from "src/components/sharedStyles";
 import {
     BotaoFechar,
     Cabecalho,
@@ -102,11 +103,14 @@ export function ModalAlteracoes({ projetoId, mergeRequest, vocabulario, onFechar
                 {carregouAoMenosUmaVez && arquivos.length === 0 && <Vazio>{TEXTO_MODAL.SEM_ARQUIVOS}</Vazio>}
 
                 {arquivos.length > 0 && (
-                    <ListaArquivos>
-                        {arquivos.map((arquivo) => (
-                            <BlocoDiffArquivo key={arquivo.caminho} arquivo={arquivo} />
-                        ))}
-                    </ListaArquivos>
+                    <AreaRelativa>
+                        <ListaArquivos>
+                            {arquivos.map((arquivo) => (
+                                <BlocoDiffArquivo key={arquivo.caminho} arquivo={arquivo} />
+                            ))}
+                        </ListaArquivos>
+                        <Carregando ativo={carregando} />
+                    </AreaRelativa>
                 )}
 
                 {proximaPagina !== null && (

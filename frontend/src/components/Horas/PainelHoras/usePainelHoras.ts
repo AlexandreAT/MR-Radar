@@ -10,15 +10,12 @@ import { FormatarDiaMes } from "src/utils/Formatacao";
 import { TEXTO_HORAS } from "./types";
 
 /**
- * Escolhe o texto exibido enquanto não há uma semana na tela.
- * @param carregando Indica se a consulta está em andamento.
+ * Escolhe o texto exibido enquanto não há uma semana na tela. O carregamento em si não entra mais
+ * aqui: o indicador central (Carregando) já cobre esse caso, por cima deste texto.
  * @param configuracaoValida Indica se o backend já consegue falar com o GitLab.
  * @returns Texto a exibir no lugar do resumo.
  */
-function getMensagemVazio(carregando: boolean, configuracaoValida: boolean): string {
-    if (carregando)
-        return TEXTO_HORAS.CARREGANDO;
-
+function getMensagemVazio(configuracaoValida: boolean): string {
     return configuracaoValida ? TEXTO_HORAS.SEM_RESUMO : TEXTO_HORAS.SEM_CONFIGURACAO;
 }
 
@@ -113,7 +110,7 @@ export function usePainelHoras(configuracao: ConfiguracaoDashboard | null) {
         resumo,
         carregando,
         erro,
-        mensagemVazio: getMensagemVazio(carregando, configuracaoValida),
+        mensagemVazio: getMensagemVazio(configuracaoValida),
         periodo: resumo ? `${FormatarDiaMes(resumo.inicioSemana)} ${TEXTO_HORAS.ATE} ${FormatarDiaMes(resumo.fimSemana)}` : "",
         diaSelecionado,
         diaReferencia,

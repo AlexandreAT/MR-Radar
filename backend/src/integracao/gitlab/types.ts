@@ -46,6 +46,8 @@ export const ORDEM_NOTAS = {
 /** Situação de Merge Request usada nas consultas. */
 export enum EstadoMergeRequestGitLab {
     Aberto = "opened",
+    Fechado = "closed",
+    Mesclado = "merged",
 }
 
 /** Tipo de posição em que um comentário pode ser ancorado no diff. */

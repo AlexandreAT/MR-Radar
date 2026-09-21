@@ -21,6 +21,8 @@ export const API_GITHUB = {
     USER_AGENT: "mr-radar/0.1 (local, somente leitura)",
     /** Acima disso a Contents API para de mandar o conteúdo em base64 dentro do JSON. */
     TAMANHO_MAX_CONTEUDO_JSON_BYTES: 1024 * 1024,
+    /** A Search API só alcança até esta posição nos resultados, não importa o total_count real. */
+    MAX_RESULTADOS_BUSCA: 1000,
 } as const;
 
 /** Filtro da busca que corresponde a cada escopo exibido na tela. */
@@ -73,6 +75,8 @@ export interface PullRequestGitHub {
     title: string;
     html_url: string;
     state: string;
+    /** Preenchido só quando o Pull Request foi mesclado — nulo mesmo já fechado sem mesclar. */
+    merged_at: string | null;
     draft?: boolean;
     user: UsuarioGitHub | null;
     head: RefGitHub;
@@ -149,6 +153,8 @@ export interface RepositorioGitHub {
 /** Situação aceita ao listar Pull Requests de um repositório. */
 export enum EstadoPullRequestGitHub {
     Aberto = "open",
+    /** Cobre fechado e mesclado — o GitHub não distingue os dois neste filtro. */
+    Fechado = "closed",
 }
 
 /** Conteúdo de um arquivo devolvido pela API de conteúdo. */

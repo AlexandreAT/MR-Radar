@@ -142,6 +142,16 @@ export enum EscopoMergeRequest {
 }
 
 /**
+ * Situação atual do Merge Request. "Mesclado" e "Fechado" são estados terminais distintos: um
+ * Merge Request fechado sem ser mesclado nunca teve o código incorporado.
+ */
+export enum SituacaoMergeRequest {
+    Aberto = "aberto",
+    Fechado = "fechado",
+    Mesclado = "mesclado",
+}
+
+/**
  * Status do chamado (issue) vinculado ao Merge Request, reconhecido a partir das tags dele.
  * Só os valores conhecidos do quadro contam — qualquer outra tag no chamado é ignorada aqui.
  */
@@ -159,6 +169,7 @@ export interface MergeRequestAberto {
     iid: number;
     titulo: string;
     url: string;
+    situacao: SituacaoMergeRequest;
     /** Status do chamado vinculado, quando reconhecido. Só existe no GitLab. */
     statusChamado: StatusChamado | null;
     /** Tag "Válido"/"Inválido" do chamado vinculado, quando existir. Só existe no GitLab. */
@@ -189,6 +200,20 @@ export interface ResultadoPesquisaMergeRequests {
     mergeRequests: MergeRequestAberto[];
     consultadoEm: string;
     paginacaoTruncada: boolean;
+}
+
+/**
+ * Página de Merge Requests encerrados (fechados ou mesclados) — usada tanto pela listagem por
+ * escopo quanto pela pesquisa por título, com paginação real de tamanho fixo (20 por página).
+ */
+export interface PaginaMergeRequestsEncerrados {
+    mergeRequests: MergeRequestAberto[];
+    pagina: number;
+    totalPaginas: number;
+    totalItens: number;
+    consultadoEm: string;
+    /** Verdadeiro quando o total pode ser maior que o real: a coleta parou no limite de segurança. */
+    truncada: boolean;
 }
 
 /** Parâmetros aceitos na consulta de comentários. */

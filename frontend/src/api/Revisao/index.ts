@@ -4,6 +4,7 @@ import {
     EscopoMergeRequest,
     ListaMergeRequestsAbertos,
     PaginaArquivosAlterados,
+    PaginaMergeRequestsEncerrados,
     ParametrosBuscaRevisao,
     ResultadoPesquisaMergeRequests,
     RevisaoMergeRequest,
@@ -36,6 +37,30 @@ export async function GetMeusMergeRequests(escopo: EscopoMergeRequest, sinal?: A
  */
 export async function BuscarMergeRequests(termo: string, sinal?: AbortSignal): Promise<ResultadoPesquisaMergeRequests> {
     return GetJson<ResultadoPesquisaMergeRequests>("/merge-requests/pesquisar", { termo }, sinal);
+}
+
+/**
+ * Busca os Merge Requests encerrados (fechados ou mesclados) do usuário dono do token, com
+ * paginação real.
+ * @param escopo Se a lista traz os Merge Requests criados por ele ou os atribuídos a ele.
+ * @param pagina Página pedida, a partir de 1.
+ * @param sinal Sinal usado para cancelar a consulta anterior.
+ * @returns Página de Merge Requests encerrados, do mais recente para o mais antigo.
+ */
+export async function GetMeusMergeRequestsEncerrados(escopo: EscopoMergeRequest, pagina: number, sinal?: AbortSignal): Promise<PaginaMergeRequestsEncerrados> {
+    return GetJson<PaginaMergeRequestsEncerrados>("/merge-requests/encerrados", { escopo, pagina: String(pagina) }, sinal);
+}
+
+/**
+ * Pesquisa Merge Requests encerrados (fechados ou mesclados) pelo título, entre todos os que o
+ * token enxerga, com paginação real.
+ * @param termo Texto pesquisado no título.
+ * @param pagina Página pedida, a partir de 1.
+ * @param sinal Sinal usado para cancelar a consulta anterior.
+ * @returns Página de Merge Requests encontrados, do mais recente para o mais antigo.
+ */
+export async function BuscarMergeRequestsEncerrados(termo: string, pagina: number, sinal?: AbortSignal): Promise<PaginaMergeRequestsEncerrados> {
+    return GetJson<PaginaMergeRequestsEncerrados>("/merge-requests/encerrados/pesquisar", { termo, pagina: String(pagina) }, sinal);
 }
 
 /**

@@ -78,6 +78,11 @@ export const LinkExterno = styled.a`
     }
 `;
 
+/** Ancora um indicador de carregamento (ou qualquer sobreposição) só a este bloco, nunca à tela inteira. */
+export const AreaRelativa = styled.div`
+    position: relative;
+`;
+
 /** Título curto que identifica um bloco de conteúdo. */
 export const TituloBloco = styled.span`
     font-size: 11px;

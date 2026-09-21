@@ -1,5 +1,5 @@
 import { DiscussaoNormalizada, NotaNormalizada, PosicaoResolvida } from "../../logica/types";
-import { ArquivoAlterado, Autor, LadoDiff, LinhaDiff, MergeRequestAberto, MergeRequestResumo, StatusArquivoAlterado, StatusChamado, TipoLinhaDiff } from "../../models/Revisao/types";
+import { ArquivoAlterado, Autor, LadoDiff, LinhaDiff, MergeRequestAberto, MergeRequestResumo, SituacaoMergeRequest, StatusArquivoAlterado, StatusChamado, TipoLinhaDiff } from "../../models/Revisao/types";
 import { EstaNaListaDeIgnorados } from "../../utilidades/AutorSistema";
 import { InterpretarDiffUnificado } from "../../utilidades/DiffUnificado";
 import { GetLinguagem } from "../../utilidades/Linguagem";
@@ -23,6 +23,18 @@ const MOTIVO_DIFF_INDISPONIVEL = "Arquivo grande demais para exibir aqui — abr
 
 /** Separador entre o caminho do projeto e o IID na referência do GitLab. */
 const SEPARADOR_REFERENCIA = "!";
+
+/**
+ * Situação correspondente a cada estado bruto do GitLab. "locked" é tratado como Fechado: é um
+ * estado raro (trava a discussão sem decidir o destino do código) e não justifica uma quarta opção
+ * na tela.
+ */
+const SITUACAO_POR_ESTADO_GITLAB: Record<string, SituacaoMergeRequest> = {
+    opened: SituacaoMergeRequest.Aberto,
+    closed: SituacaoMergeRequest.Fechado,
+    merged: SituacaoMergeRequest.Mesclado,
+    locked: SituacaoMergeRequest.Fechado,
+};
 
 /**
  * Tag de cada status conhecido do quadro, já normalizada — o quadro tem tags digitadas por
@@ -256,6 +268,7 @@ export function ConverterMergeRequestAberto(mergeRequest: MergeRequestListaGitLa
         iid: mergeRequest.iid,
         titulo: mergeRequest.title,
         url: mergeRequest.web_url,
+        situacao: SITUACAO_POR_ESTADO_GITLAB[mergeRequest.state] ?? SituacaoMergeRequest.Fechado,
         // O status e a validade do chamado dependem de uma chamada à parte (o vínculo com a issue
         // não vem nesta listagem) — entram depois, via InterpretarStatusChamado.
         statusChamado: null,

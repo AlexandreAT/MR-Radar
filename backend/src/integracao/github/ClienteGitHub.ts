@@ -2,12 +2,12 @@ import { OutgoingHttpHeaders } from "http";
 import { ConfiguracaoApp, LIMITE } from "../../configuracao/types";
 import { DiscussaoNormalizada } from "../../logica/types";
 import { EscopoMergeRequest, MergeRequestAberto, MergeRequestResumo, PaginaArquivosAlterados } from "../../models/Revisao/types";
-import { MapearComLimite } from "../../utilidades/Colecoes";
+import { MapearComLimite, PaginarLista } from "../../utilidades/Colecoes";
 import { StatusHttp } from "../../utilidades/types";
 import { ClienteRevisao } from "../ClienteRevisao";
 import { CodigoErroProvedor, ErroProvedor } from "../ErroProvedor";
 import { ExecutarGet, RespostaHttp } from "../http/ExecutarGet";
-import { PaginaResultado } from "../types";
+import { PaginaNumerada, PaginaResultado } from "../types";
 import { ConverterArquivoAlterado, ConverterPullRequest, ConverterPullRequestAberto, MontarDiscussoes } from "./ConversorGitHub";
 import { GetStatusResolucaoDasThreads } from "./ExecutarGraphQLStatusResolucao";
 import {
@@ -124,6 +124,45 @@ export class ClienteGitHub implements ClienteRevisao {
     }
 
     /**
+     * Lista os Pull Requests encerrados (fechados ou mesclados) do dono do token, com paginação real.
+     *
+     * Diferente de GetMergeRequestsAbertos, esta consulta pagina nativamente pela própria Search
+     * API (page/per_page) em vez de trazer tudo de uma vez. A Search API só alcança até
+     * MAX_RESULTADOS_BUSCA posições — por isso a página pedida é limitada a esse teto antes da
+     * consulta, e o total informado também é limitado a ele, marcando a lista como truncada.
+     * @param escopo Se a lista traz os criados por ele ou os atribuídos a ele.
+     * @param pagina Página pedida, a partir de 1.
+     * @returns Página de Pull Requests encerrados, do mais recente para o mais antigo.
+     */
+    public async GetMergeRequestsEncerrados(escopo: EscopoMergeRequest, pagina: number): Promise<PaginaNumerada<MergeRequestAberto>> {
+        const tamanhoPagina: number = LIMITE.MERGE_REQUESTS_ENCERRADOS_POR_PAGINA;
+        const paginaMaxima: number = Math.floor(API_GITHUB.MAX_RESULTADOS_BUSCA / tamanhoPagina);
+        const paginaPedida: number = Math.min(Math.max(1, pagina), paginaMaxima);
+        const consulta = `is:pr is:closed ${FILTRO_POR_ESCOPO[escopo]}`;
+        const busca: ResultadoBuscaGitHub = await this.getJson<ResultadoBuscaGitHub>("/search/issues", {
+            q: consulta,
+            sort: "updated",
+            order: "desc",
+            per_page: tamanhoPagina,
+            page: paginaPedida,
+        });
+
+        const itens: ItemBuscaGitHub[] = busca.items ?? [];
+        const detalhados: DetalheDaBusca[] = await MapearComLimite(itens, this.configuracao.consultasSimultaneas, (item) => this.getDetalheDaBusca(item));
+        const algumFalhou: boolean = detalhados.some((detalhe) => detalhe.falhou);
+        const totalReal: number = busca.total_count ?? 0;
+        const totalItens: number = Math.min(totalReal, API_GITHUB.MAX_RESULTADOS_BUSCA);
+
+        return {
+            itens: detalhados.map((detalhe) => detalhe.item).filter((item): item is MergeRequestAberto => item !== null),
+            pagina: paginaPedida,
+            totalPaginas: Math.max(1, Math.ceil(totalItens / tamanhoPagina)),
+            totalItens,
+            truncada: Boolean(busca.incomplete_results) || algumFalhou || totalReal > API_GITHUB.MAX_RESULTADOS_BUSCA,
+        };
+    }
+
+    /**
      * Pesquisa Pull Requests abertos pelo título, entre os repositórios que o token enxerga — não
      * só os criados ou atribuídos ao dono do token.
      *
@@ -141,7 +180,7 @@ export class ClienteGitHub implements ClienteRevisao {
         const termoNormalizado: string = termo.toLowerCase();
 
         const resultados: PaginaResultado<MergeRequestAberto>[] = await MapearComLimite(repositorios.itens, this.configuracao.consultasSimultaneas, (repositorio) =>
-            this.buscarNoRepositorio(repositorio, termoNormalizado),
+            this.buscarNoRepositorio(repositorio, termoNormalizado, EstadoPullRequestGitHub.Aberto),
         );
 
         const itens: MergeRequestAberto[] = resultados.flatMap((resultado) => resultado.itens);
@@ -149,6 +188,38 @@ export class ClienteGitHub implements ClienteRevisao {
 
         return {
             itens,
+            truncada: repositorios.truncada || resultados.some((resultado) => resultado.truncada),
+        };
+    }
+
+    /**
+     * Pesquisa Pull Requests encerrados (fechados ou mesclados) pelo título, entre os repositórios
+     * que o token enxerga, com paginação real.
+     *
+     * Assim como BuscarMergeRequests, não há como paginar nativamente uma busca espalhada por
+     * vários repositórios: todos os candidatos são coletados e ordenados antes de recortar a
+     * página pedida.
+     * @param termo Texto pesquisado no título.
+     * @param pagina Página pedida, a partir de 1.
+     * @returns Página de Pull Requests encontrados, do mais recente para o mais antigo.
+     */
+    public async BuscarMergeRequestsEncerrados(termo: string, pagina: number): Promise<PaginaNumerada<MergeRequestAberto>> {
+        const repositorios: PaginaResultado<RepositorioGitHub> = await this.getRepositoriosParaPesquisa();
+        const termoNormalizado: string = termo.toLowerCase();
+
+        const resultados: PaginaResultado<MergeRequestAberto>[] = await MapearComLimite(repositorios.itens, this.configuracao.consultasSimultaneas, (repositorio) =>
+            this.buscarNoRepositorio(repositorio, termoNormalizado, EstadoPullRequestGitHub.Fechado),
+        );
+
+        const itens: MergeRequestAberto[] = resultados.flatMap((resultado) => resultado.itens);
+        itens.sort((primeiro, segundo) => segundo.atualizadoEm.localeCompare(primeiro.atualizadoEm));
+        const recorte = PaginarLista(itens, pagina, LIMITE.MERGE_REQUESTS_ENCERRADOS_POR_PAGINA);
+
+        return {
+            itens: recorte.itens,
+            pagina: recorte.pagina,
+            totalPaginas: recorte.totalPaginas,
+            totalItens: itens.length,
             truncada: repositorios.truncada || resultados.some((resultado) => resultado.truncada),
         };
     }
@@ -181,12 +252,13 @@ export class ClienteGitHub implements ClienteRevisao {
      * de simplesmente sumir sem explicação.
      * @param repositorio Repositório a pesquisar.
      * @param termoNormalizado Termo pesquisado, já em minúsculas.
+     * @param estado Situação dos Pull Requests pesquisados (abertos, ou fechados/mesclados).
      * @returns Pull Requests encontrados nesse repositório e se ele pode ter mais do que os lidos.
      */
-    private async buscarNoRepositorio(repositorio: RepositorioGitHub, termoNormalizado: string): Promise<PaginaResultado<MergeRequestAberto>> {
+    private async buscarNoRepositorio(repositorio: RepositorioGitHub, termoNormalizado: string, estado: EstadoPullRequestGitHub): Promise<PaginaResultado<MergeRequestAberto>> {
         try {
             const pullRequests: PullRequestGitHub[] = await this.getJson<PullRequestGitHub[]>(`/repos/${repositorio.full_name}/pulls`, {
-                state: EstadoPullRequestGitHub.Aberto,
+                state: estado,
                 per_page: API_GITHUB.ITENS_POR_PAGINA,
             });
             const encontrados: PullRequestGitHub[] = pullRequests.filter((pullRequest) => pullRequest.title.toLowerCase().includes(termoNormalizado));

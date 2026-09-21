@@ -42,6 +42,8 @@ export const LIMITE = {
     MAX_PAGINAS_LIMITE: 200,
     /** Arquivos por página ao listar os arquivos alterados de um Merge Request. */
     ARQUIVOS_ALTERADOS_POR_PAGINA: 20,
+    /** Itens por página ao listar ou pesquisar Merge Requests encerrados (fechados ou mesclados). */
+    MERGE_REQUESTS_ENCERRADOS_POR_PAGINA: 20,
     /** Acima disso, o diff de um arquivo entra como indisponível em vez de ser exibido. */
     MAX_LINHAS_DIFF_POR_ARQUIVO: 1000,
     /** Abaixo disso, a pesquisa de Merge Requests por título nem chega a ser feita. */

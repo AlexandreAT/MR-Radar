@@ -1,6 +1,7 @@
 export { Botao } from "./Botao";
 export { VarianteBotao } from "./Botao/types";
 export { CampoSelecao } from "./CampoSelecao";
+export { Carregando } from "./Carregando";
 export type { GrupoOpcoes, OpcaoSelecao } from "./CampoSelecao/types";
 export { CampoTexto } from "./CampoTexto";
 export { DicaHover } from "./DicaHover";

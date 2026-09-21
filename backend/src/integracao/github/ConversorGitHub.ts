@@ -1,5 +1,5 @@
 import { DiscussaoNormalizada, NotaNormalizada, PosicaoResolvida } from "../../logica/types";
-import { ArquivoAlterado, Autor, LadoDiff, MergeRequestAberto, MergeRequestResumo, StatusArquivoAlterado } from "../../models/Revisao/types";
+import { ArquivoAlterado, Autor, LadoDiff, MergeRequestAberto, MergeRequestResumo, SituacaoMergeRequest, StatusArquivoAlterado } from "../../models/Revisao/types";
 import { EstaNaListaDeIgnorados } from "../../utilidades/AutorSistema";
 import { InterpretarDiffUnificado } from "../../utilidades/DiffUnificado";
 import { GetLinguagem } from "../../utilidades/Linguagem";
@@ -7,6 +7,7 @@ import {
     ArquivoAlteradoGitHub,
     ComentarioIssueGitHub,
     ComentarioRevisaoGitHub,
+    EstadoPullRequestGitHub,
     LadoGitHub,
     PullRequestGitHub,
     StatusArquivoGitHub,
@@ -80,6 +81,7 @@ export function ConverterPullRequestAberto(pullRequest: PullRequestGitHub, proje
         iid: pullRequest.number,
         titulo: pullRequest.title,
         url: pullRequest.html_url,
+        situacao: getSituacaoPullRequest(pullRequest),
         // Status do chamado só existe para o GitLab, que tem o conceito de chamado vinculado.
         statusChamado: null,
         chamadoValido: null,
@@ -90,6 +92,19 @@ export function ConverterPullRequestAberto(pullRequest: PullRequestGitHub, proje
         temThreadsAbertas: null,
         totalComentarios: (pullRequest.comments ?? 0) + (pullRequest.review_comments ?? 0),
     };
+}
+
+/**
+ * Descobre a situação do Pull Request. O GitHub só tem "open"/"closed" no campo state — um
+ * fechado sem ser mesclado e um mesclado têm o mesmo state, e só merged_at distingue os dois.
+ * @param pullRequest Pull Request devolvido pela API.
+ * @returns Situação no formato de domínio.
+ */
+function getSituacaoPullRequest(pullRequest: PullRequestGitHub): SituacaoMergeRequest {
+    if (pullRequest.state !== EstadoPullRequestGitHub.Fechado)
+        return SituacaoMergeRequest.Aberto;
+
+    return pullRequest.merged_at ? SituacaoMergeRequest.Mesclado : SituacaoMergeRequest.Fechado;
 }
 
 /**

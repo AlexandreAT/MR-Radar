@@ -15,6 +15,7 @@ export function useApp() {
     const [pagina, setPagina] = useState<PaginaApp>(() => GetPaginaDoHash(window.location.hash));
     const [configuracao, setConfiguracao] = useState<ConfiguracaoDashboard | null>(null);
     const [erroConfiguracao, setErroConfiguracao] = useState<MensagemErro | null>(null);
+    const [carregandoConfiguracao, setCarregandoConfiguracao] = useState<boolean>(true);
 
     useEffect(() => {
         const aoTrocarHash = () => setPagina(GetPaginaDoHash(window.location.hash));
@@ -56,7 +57,10 @@ export function useApp() {
             }
         }
 
-        void carregarConfiguracao();
+        void carregarConfiguracao().finally(() => {
+            if (!cancelado)
+                setCarregandoConfiguracao(false);
+        });
 
         return () => {
             cancelado = true;
@@ -77,6 +81,7 @@ export function useApp() {
         pagina,
         configuracao,
         erroConfiguracao,
+        carregandoConfiguracao,
         handleAlterarPagina,
     };
 }

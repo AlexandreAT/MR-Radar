@@ -1,6 +1,6 @@
 import { DiscussaoNormalizada } from "../logica/types";
 import { EscopoMergeRequest, MergeRequestAberto, MergeRequestResumo, PaginaArquivosAlterados } from "../models/Revisao/types";
-import { PaginaResultado } from "./types";
+import { PaginaNumerada, PaginaResultado } from "./types";
 
 /**
  * Porta que a lógica de revisão usa para falar com o provedor configurado (GitLab ou GitHub),
@@ -30,6 +30,24 @@ export interface ClienteRevisao {
      * @returns Merge Requests encontrados, do mais recente para o mais antigo.
      */
     BuscarMergeRequests(termo: string): Promise<PaginaResultado<MergeRequestAberto>>;
+
+    /**
+     * Lista os Merge Requests encerrados (fechados ou mesclados) do usuário dono do token, com
+     * paginação real de 20 itens por página.
+     * @param escopo Se a lista traz os criados por ele ou os atribuídos a ele.
+     * @param pagina Página pedida, a partir de 1.
+     * @returns Página de Merge Requests encerrados, do mais recente para o mais antigo.
+     */
+    GetMergeRequestsEncerrados(escopo: EscopoMergeRequest, pagina: number): Promise<PaginaNumerada<MergeRequestAberto>>;
+
+    /**
+     * Pesquisa Merge Requests encerrados (fechados ou mesclados) pelo título, entre todos os
+     * projetos que o token enxerga, com paginação real de 20 itens por página.
+     * @param termo Texto pesquisado no título.
+     * @param pagina Página pedida, a partir de 1.
+     * @returns Página de Merge Requests encontrados, do mais recente para o mais antigo.
+     */
+    BuscarMergeRequestsEncerrados(termo: string, pagina: number): Promise<PaginaNumerada<MergeRequestAberto>>;
 
     /**
      * Busca as threads de comentários de um Merge Request, já normalizadas.

@@ -9,6 +9,7 @@ import {
     EscopoMergeRequest,
     ListaMergeRequestsAbertos,
     PaginaArquivosAlterados,
+    PaginaMergeRequestsEncerrados,
     ParametrosConsultaRevisao,
     ResultadoPesquisaMergeRequests,
     RevisaoMergeRequest,
@@ -69,6 +70,28 @@ export function CriarRotasRevisao(logicaRevisao: LogicaRevisao, logicaMergeReque
             const resultado: ResultadoPesquisaMergeRequests = await logicaMergeRequest.Buscar(lerTermo(requisicao, configuracao));
 
             resposta.json(resultado);
+        }),
+    );
+
+    rotas.get(
+        "/merge-requests/encerrados",
+        Envolver(async (requisicao: Request, resposta: Response) => {
+            GarantirConfiguracaoValida(configuracao);
+
+            const pagina: PaginaMergeRequestsEncerrados = await logicaMergeRequest.GetEncerrados(lerEscopo(requisicao), lerPagina(requisicao));
+
+            resposta.json(pagina);
+        }),
+    );
+
+    rotas.get(
+        "/merge-requests/encerrados/pesquisar",
+        Envolver(async (requisicao: Request, resposta: Response) => {
+            GarantirConfiguracaoValida(configuracao);
+
+            const pagina: PaginaMergeRequestsEncerrados = await logicaMergeRequest.BuscarEncerrados(lerTermo(requisicao, configuracao), lerPagina(requisicao));
+
+            resposta.json(pagina);
         }),
     );
 

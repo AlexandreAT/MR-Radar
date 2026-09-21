@@ -10,4 +10,5 @@ export const ESPERA_ENTRE_TENTATIVAS_MS = 1000;
 /** Mensagens exibidas fora das páginas. */
 export const MENSAGEM_APP = {
     ERRO_CONFIGURACAO: "Não foi possível carregar a configuração do backend.",
+    CARREGANDO_CONFIGURACAO: "Carregando configuração...",
 } as const;

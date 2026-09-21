@@ -1,9 +1,10 @@
-import { Botao } from "src/components/BasicComponents";
+import { Botao, Carregando } from "src/components/BasicComponents";
 import { CartaoComentario } from "src/components/Revisao/CartaoComentario";
 import { FiltroComentarios } from "src/components/Revisao/FiltroComentarios";
 import { FiltroRevisao } from "src/components/Revisao/FiltroRevisao";
 import { ListaMergeRequests } from "src/components/Revisao/ListaMergeRequests";
 import { ResumoMergeRequest } from "src/components/Revisao/ResumoMergeRequest";
+import { AreaRelativa } from "src/components/sharedStyles";
 import { CaixaAviso, CaixaErro, ContadorExibidos, DicaErro, LinhaAcoes, Lista, Pagina, TextoAviso, TextoErro, Vazio } from "./styles";
 import { MENSAGEM, PropriedadesPainelRevisao, TEXTO_POR_ESTADO_COPIA } from "./types";
 import { usePainelRevisao } from "./usePainelRevisao";
@@ -29,26 +30,11 @@ export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
         comentarios,
         textoContador,
         estadoCopia,
-        escopo,
-        meusMergeRequests,
-        listaTruncada,
-        carregandoLista,
-        erroLista,
-        termoPesquisa,
-        podePesquisar,
-        resultadosPesquisa,
-        pesquisaTruncada,
-        pesquisando,
-        erroPesquisa,
         handleAlterarProjeto,
         handleAlterarStatus,
         handleAlterarSituacao,
         handleAlterarOrdenacao,
         handleAlterarIntervalo,
-        handleAlterarEscopo,
-        handleAtualizarLista,
-        handleAlterarTermoPesquisa,
-        handlePesquisar,
         handleSelecionarMergeRequest,
         handleBuscar,
         handleCopiarComentarios,
@@ -59,33 +45,7 @@ export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
 
     return (
         <Pagina>
-            {erroLista && (
-                <CaixaErro>
-                    <TextoErro>{erroLista.mensagem}</TextoErro>
-                    {erroLista.dica && <DicaErro>{erroLista.dica}</DicaErro>}
-                </CaixaErro>
-            )}
-
-            <ListaMergeRequests
-                vocabulario={vocabulario}
-                mergeRequests={meusMergeRequests}
-                escopo={escopo}
-                carregando={carregandoLista}
-                paginacaoTruncada={listaTruncada}
-                projetoSelecionado={projetoId}
-                mrSelecionado={mrIid}
-                termoPesquisa={termoPesquisa}
-                podePesquisar={podePesquisar}
-                resultadosPesquisa={resultadosPesquisa}
-                pesquisaTruncada={pesquisaTruncada}
-                pesquisando={pesquisando}
-                erroPesquisa={erroPesquisa?.mensagem ?? null}
-                onAlterarEscopo={handleAlterarEscopo}
-                onSelecionar={handleSelecionarMergeRequest}
-                onAtualizar={handleAtualizarLista}
-                onAlterarTermoPesquisa={handleAlterarTermoPesquisa}
-                onPesquisar={handlePesquisar}
-            />
+            <ListaMergeRequests configuracao={configuracao} projetoSelecionado={projetoId} mrSelecionado={mrIid} onSelecionar={handleSelecionarMergeRequest} />
 
             <FiltroRevisao
                 vocabulario={vocabulario}
@@ -149,11 +109,14 @@ export function PainelRevisao({ configuracao }: PropriedadesPainelRevisao) {
 
             {revisao && comentarios.length === 0 && <Vazio>{MENSAGEM.SEM_COMENTARIOS}</Vazio>}
 
-            <Lista>
-                {comentarios.map((comentario) => (
-                    <CartaoComentario key={comentario.id} comentario={comentario} vocabulario={vocabulario} />
-                ))}
-            </Lista>
+            <AreaRelativa>
+                <Lista>
+                    {comentarios.map((comentario) => (
+                        <CartaoComentario key={comentario.id} comentario={comentario} vocabulario={vocabulario} />
+                    ))}
+                </Lista>
+                <Carregando ativo={carregando} />
+            </AreaRelativa>
         </Pagina>
     );
 }

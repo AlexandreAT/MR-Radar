@@ -1,6 +1,6 @@
 import { ClienteRevisao } from "../integracao/ClienteRevisao";
-import { PaginaResultado } from "../integracao/types";
-import { EscopoMergeRequest, ListaMergeRequestsAbertos, MergeRequestAberto, ResultadoPesquisaMergeRequests } from "../models/Revisao/types";
+import { PaginaNumerada, PaginaResultado } from "../integracao/types";
+import { EscopoMergeRequest, ListaMergeRequestsAbertos, MergeRequestAberto, PaginaMergeRequestsEncerrados, ResultadoPesquisaMergeRequests } from "../models/Revisao/types";
 
 /** Monta a lista de Merge Requests abertos que o usuário vê ao abrir o dashboard. */
 export class LogicaMergeRequest {
@@ -44,4 +44,45 @@ export class LogicaMergeRequest {
             paginacaoTruncada: pagina.truncada,
         };
     }
+
+    /**
+     * Lista os Merge Requests encerrados (fechados ou mesclados) do usuário dono do token.
+     * @param escopo Se a lista traz os Merge Requests criados por ele ou os atribuídos a ele.
+     * @param pagina Página pedida, a partir de 1.
+     * @returns Página de Merge Requests encerrados, do mais recente para o mais antigo.
+     */
+    public async GetEncerrados(escopo: EscopoMergeRequest, pagina: number): Promise<PaginaMergeRequestsEncerrados> {
+        const resultado: PaginaNumerada<MergeRequestAberto> = await this.cliente.GetMergeRequestsEncerrados(escopo, pagina);
+
+        return montarPaginaEncerrados(resultado);
+    }
+
+    /**
+     * Pesquisa Merge Requests encerrados (fechados ou mesclados) pelo título, entre todos os que o
+     * token enxerga.
+     * @param termo Texto pesquisado no título, já validado como não vazio.
+     * @param pagina Página pedida, a partir de 1.
+     * @returns Página de Merge Requests encontrados, do mais recente para o mais antigo.
+     */
+    public async BuscarEncerrados(termo: string, pagina: number): Promise<PaginaMergeRequestsEncerrados> {
+        const resultado: PaginaNumerada<MergeRequestAberto> = await this.cliente.BuscarMergeRequestsEncerrados(termo, pagina);
+
+        return montarPaginaEncerrados(resultado);
+    }
+}
+
+/**
+ * Monta a resposta de uma página de Merge Requests encerrados, no formato usado pela tela.
+ * @param resultado Página já resolvida pelo cliente do provedor.
+ * @returns Página pronta para a tela, com o instante da consulta.
+ */
+function montarPaginaEncerrados(resultado: PaginaNumerada<MergeRequestAberto>): PaginaMergeRequestsEncerrados {
+    return {
+        mergeRequests: resultado.itens,
+        pagina: resultado.pagina,
+        totalPaginas: resultado.totalPaginas,
+        totalItens: resultado.totalItens,
+        consultadoEm: new Date().toISOString(),
+        truncada: resultado.truncada,
+    };
 }
