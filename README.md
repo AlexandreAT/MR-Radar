@@ -1,5 +1,7 @@
 # MR Radar
 
+> 🔎 **[Veja funcionando, sem instalar nada](#)** — demonstração pública com dados 100% fictícios, sem conexão nenhuma com GitLab ou GitHub de verdade.
+
 Dashboard local que lista, em uma tela só, todos os comentários de revisão de um Merge Request do GitLab — ou de um Pull Request do GitHub — com o texto do comentário, o arquivo, a linha e o trecho de código marcado, para não precisar abrir thread por thread.
 
 O provedor é escolhido em uma linha do `.env` (`PROVEDOR=gitlab` ou `PROVEDOR=github`). As telas e as funcionalidades são as mesmas nos dois; o que muda está em [Diferenças entre GitLab e GitHub](#diferenças-entre-gitlab-e-github).
@@ -15,7 +17,9 @@ Roda inteiramente na sua máquina, usando o seu Personal Access Token, e **é so
 
 ## Segurança
 
-Não existe versão hospedada nem configuração compartilhada, de propósito: para usar, você clona o repositório e coloca as suas credenciais no `backend/.env`, que fica apenas na sua máquina e está no `.gitignore`. Assim o seu token e os dados da sua conta nunca passam por terceiros nem vão para o repositório.
+Não existe versão hospedada com credencial nenhuma, de propósito: para usar de verdade (GitLab ou GitHub), você clona o repositório e coloca as suas credenciais no `backend/.env`, que fica apenas na sua máquina e está no `.gitignore`. Assim o seu token e os dados da sua conta nunca passam por terceiros nem vão para o repositório.
+
+A única coisa hospedada publicamente é a demonstração (link no topo deste README): uma build estática do frontend, gerada a partir de um terceiro adapter (`PROVEDOR=demo`) com dados 100% fictícios. Ela não faz nenhuma chamada de rede a nenhum provedor, não lê nenhuma variável de `.env` e não tem backend nenhum rodando por trás — é só o frontend lendo arquivos JSON estáticos.
 
 O projeto também não faz nenhuma alteração no GitLab nem no GitHub. Isso não é só uma convenção — está garantido em três camadas:
 
@@ -142,6 +146,8 @@ GITHUB_TOKEN=seu_token_aqui
 - `GITHUB_URL` — deixe de fora para usar o github.com. Só preencha em **GitHub Enterprise Server**, com o endereço da instância, sem `/api/v3` e sem barra no final; o sufixo é acrescentado sozinho.
 
 Dá para deixar as credenciais dos dois preenchidas ao mesmo tempo e alternar só a linha do `PROVEDOR` — o backend lê apenas as do provedor ativo. O arquivo `.env` está no `.gitignore` e **não deve ser commitado**.
+
+Existe ainda um terceiro valor, `PROVEDOR=demo`, que não exige nenhuma variável — é o adapter com dados fictícios usado só para gerar a demonstração pública (ver [Endpoints do backend](#endpoints-do-backend) e a pasta `backend/src/integracao/demo/`). Não há motivo para usá-lo no seu dia a dia.
 
 Ajustes opcionais, todos com valor padrão e comentados em `backend/.env.example`: `PORT`, `HOST`, `CONTEXT_LINES`, `REQUEST_TIMEOUT_MS`, `MAX_PAGES`, `FILE_CACHE_TTL_MS`, `IGNORED_AUTHORS`.
 
@@ -317,16 +323,21 @@ Comentários gerais (feitos direto na revisão, sem marcar uma linha de código)
 mr-radar/
 ├─ backend/                       Node + Express + TypeScript
 │  └─ src/
+│     ├─ index.ts                 Lê o .env e sobe o servidor
+│     ├─ Aplicacao.ts             Monta o Express (middlewares e rotas), sem ler .env nenhum
 │     ├─ configuracao/            Leitura e validação do .env, por provedor
 │     ├─ controllers/             Rotas (recebem, chamam a lógica, devolvem)
 │     ├─ integracao/              Conversa com o provedor
 │     │  ├─ ClienteRevisao.ts     A interface comum que a lógica enxerga
+│     │  ├─ ClienteHoras.ts       A interface da página de Horas (GitLab e demo)
 │     │  ├─ http/                 Cliente HTTP compartilhado, fixo em GET
 │     │  ├─ gitlab/               Cliente e conversor da API v4 do GitLab
-│     │  └─ github/               Cliente e conversor da API REST do GitHub, mais o GraphQL isolado
+│     │  ├─ github/               Cliente e conversor da API REST do GitHub, mais o GraphQL isolado
+│     │  └─ demo/                 Adapter da demonstração: dados fictícios, sem rede nenhuma
 │     ├─ logica/                  Regras: listagem, normalização, filtros, trecho de código e horas
 │     ├─ middlewares/             Bloqueio de escrita, CORS local e tratamento de erros
 │     ├─ models/                  Tipos e enums do domínio, por assunto (Revisao, Horas)
+│     ├─ scripts/                 Geração das fixtures estáticas da demonstração
 │     └─ utilidades/              Funções genéricas reaproveitáveis (semana, tempo gasto, coleções)
 ├─ frontend/                      React + Vite + TypeScript + styled-components
 │  └─ src/
@@ -341,6 +352,7 @@ mr-radar/
 │     ├─ styles/                  Tema e estilo global
 │     └─ utils/                   Formatação, filtro/ordenação, leitura de URL, vocabulário por provedor e notificação de token
 ├─ scripts/dev.mjs                Sobe backend e frontend juntos
+├─ netlify.toml                   Build da demonstração estática
 └─ README.md
 ```
 

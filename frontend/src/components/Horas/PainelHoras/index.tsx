@@ -34,6 +34,7 @@ export function PainelHoras({ configuracao }: PropriedadesPainelHoras) {
         diaSelecionado,
         diaReferencia,
         ehDiaReferenciaHoje,
+        podeNavegarSemana,
         handleSemanaAnterior,
         handleSemanaSeguinte,
         handleSelecionarDia,
@@ -58,13 +59,17 @@ export function PainelHoras({ configuracao }: PropriedadesPainelHoras) {
                                 <Subtitulo>{TEXTO_HORAS.SUBTITULO}</Subtitulo>
                             </BlocoTitulo>
                             <Navegacao>
-                                <Botao onClick={handleSemanaAnterior} desabilitado={carregando}>
-                                    {TEXTO_HORAS.SEMANA_ANTERIOR}
-                                </Botao>
+                                {podeNavegarSemana && (
+                                    <Botao onClick={handleSemanaAnterior} desabilitado={carregando}>
+                                        {TEXTO_HORAS.SEMANA_ANTERIOR}
+                                    </Botao>
+                                )}
                                 <Periodo>{periodo}</Periodo>
-                                <Botao onClick={handleSemanaSeguinte} desabilitado={carregando || resumo.ehSemanaAtual}>
-                                    {TEXTO_HORAS.SEMANA_SEGUINTE}
-                                </Botao>
+                                {podeNavegarSemana && (
+                                    <Botao onClick={handleSemanaSeguinte} desabilitado={carregando || resumo.ehSemanaAtual}>
+                                        {TEXTO_HORAS.SEMANA_SEGUINTE}
+                                    </Botao>
+                                )}
                                 <Botao onClick={handleAtualizar} desabilitado={carregando}>
                                     {carregando ? TEXTO_HORAS.CARREGANDO : TEXTO_HORAS.ATUALIZAR}
                                 </Botao>

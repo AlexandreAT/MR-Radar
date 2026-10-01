@@ -11,6 +11,8 @@ export const NOME_ERRO_CANCELAMENTO = "AbortError";
 export const MENSAGEM_SERVICO = {
     SEM_BACKEND: "Não foi possível falar com o backend local.",
     DICA_SEM_BACKEND: "Confirme se o backend está rodando com npm run dev.",
+    FORA_DA_DEMONSTRACAO: "Essa combinação não existe nesta demonstração.",
+    DICA_FORA_DA_DEMONSTRACAO: "Escolha um item da lista ou tente outro filtro.",
 } as const;
 
 /** Erro já pronto para ser exibido na tela. */

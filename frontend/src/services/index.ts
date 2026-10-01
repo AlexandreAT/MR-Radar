@@ -1,14 +1,21 @@
+import { EH_MODO_DEMO } from "src/utils/ModoDemo";
 import { ErroApi } from "./ErroApi";
+import { BuscarFixtureDemo } from "./ModoDemo";
 import { CAMINHO_BASE_API, CODIGO_ERRO_COMUNICACAO, MensagemErro, MENSAGEM_SERVICO, NOME_ERRO_CANCELAMENTO, RespostaErroApi } from "./types";
 
 /**
- * Faz uma consulta GET no backend local e devolve o conteúdo já convertido.
+ * Faz uma consulta GET no backend local e devolve o conteúdo já convertido. No modo demo (vitrine
+ * pública, build estática) não existe backend nenhum — a consulta é desviada para uma fixture
+ * estática, com o mesmo formato de resposta.
  * @param caminho Caminho da rota, sem o prefixo /api.
  * @param parametros Parâmetros de query string.
  * @param sinal Sinal usado para cancelar a requisição.
  * @returns Conteúdo da resposta.
  */
 export async function GetJson<T>(caminho: string, parametros: Record<string, string> = {}, sinal?: AbortSignal): Promise<T> {
+    if (EH_MODO_DEMO)
+        return BuscarFixtureDemo<T>(caminho, parametros);
+
     const query: string = new URLSearchParams(parametros).toString();
     const url = `${CAMINHO_BASE_API}${caminho}${query ? `?${query}` : ""}`;
     const resposta: Response = await buscar(url, sinal);

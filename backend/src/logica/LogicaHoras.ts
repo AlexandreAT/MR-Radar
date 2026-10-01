@@ -1,6 +1,6 @@
 import { ConfiguracaoApp } from "../configuracao/types";
+import { ClienteHoras } from "../integracao/ClienteHoras";
 import { CodigoErroProvedor, ErroProvedor } from "../integracao/ErroProvedor";
-import { ClienteGitLab } from "../integracao/gitlab/ClienteGitLab";
 import { CommitGitLab, EventoGitLab, IssueGitLab, MergeRequestRelacionadoGitLab, NotaGitLab, TipoNoteableGitLab, UsuarioGitLab } from "../integracao/gitlab/types";
 import { PaginaResultado } from "../integracao/types";
 import { DiaDeHoras, DiaUtil, HorasPorIssueNoDia, IssueComHoras, ParametrosConsultaHoras, ResumoHorasSemana } from "../models/Horas/types";
@@ -54,14 +54,15 @@ const MARGEM_FUSO_EM_DIAS = 1;
 
 /** Reúne as horas que o usuário lançou nas issues dele, separadas por dia útil da semana. */
 export class LogicaHoras {
-    private readonly cliente: ClienteGitLab;
+    private readonly cliente: ClienteHoras;
     private readonly configuracao: ConfiguracaoApp;
 
     /**
-     * @param cliente Cliente somente leitura da API do GitLab.
+     * @param cliente Cliente somente leitura que fala a forma bruta do GitLab (GitLab de verdade,
+     * ou o adapter de demonstração).
      * @param configuracao Configuração da aplicação.
      */
-    constructor(cliente: ClienteGitLab, configuracao: ConfiguracaoApp) {
+    constructor(cliente: ClienteHoras, configuracao: ConfiguracaoApp) {
         this.cliente = cliente;
         this.configuracao = configuracao;
     }

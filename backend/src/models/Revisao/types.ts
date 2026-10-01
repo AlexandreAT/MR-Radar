@@ -1,7 +1,11 @@
-/** Provedor de código com o qual o dashboard conversa. */
+/**
+ * Provedor de código com o qual o dashboard conversa. "Demo" não fala com nenhum provedor real —
+ * é um terceiro adapter com dados fictícios, usado para a vitrine pública do projeto.
+ */
 export enum Provedor {
     GitLab = "gitlab",
     GitHub = "github",
+    Demo = "demo",
 }
 
 /** Filtro de status aplicado às threads de comentários. */

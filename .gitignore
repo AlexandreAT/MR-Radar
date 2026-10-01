@@ -11,6 +11,9 @@ dist/
 build/
 *.tsbuildinfo
 
+# Fixtures do modo demo — geradas por "npm run fixtures:demo" (backend), nunca escritas à mão
+frontend/public/demo-data/
+
 # Logs
 *.log
 npm-debug.log*

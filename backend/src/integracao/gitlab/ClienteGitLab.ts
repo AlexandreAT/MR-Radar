@@ -4,6 +4,7 @@ import { DiscussaoNormalizada } from "../../logica/types";
 import { EscopoMergeRequest, MergeRequestAberto, MergeRequestResumo, PaginaArquivosAlterados } from "../../models/Revisao/types";
 import { MapearComLimite, PaginarLista } from "../../utilidades/Colecoes";
 import { StatusHttp } from "../../utilidades/types";
+import { ClienteHoras } from "../ClienteHoras";
 import { ClienteRevisao } from "../ClienteRevisao";
 import { CodigoErroProvedor, ErroProvedor } from "../ErroProvedor";
 import { ExecutarGet, RespostaHttp } from "../http/ExecutarGet";
@@ -41,7 +42,7 @@ const ESCOPO_GITLAB: Record<EscopoMergeRequest, EscopoGitLab> = {
 };
 
 /** Cliente somente leitura da API v4 do GitLab. */
-export class ClienteGitLab implements ClienteRevisao {
+export class ClienteGitLab implements ClienteRevisao, ClienteHoras {
     private readonly urlBaseApi: string;
     private readonly configuracao: ConfiguracaoApp;
 

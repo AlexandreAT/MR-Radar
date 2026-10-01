@@ -7,6 +7,7 @@ import { MensagemErro } from "src/services/types";
 import { AvisarSeProblemaDeToken } from "src/utils/AvisoToken";
 import { GetDataDeHojeLocal } from "src/utils/Elegibilidade";
 import { FormatarDiaMes } from "src/utils/Formatacao";
+import { EH_MODO_DEMO } from "src/utils/ModoDemo";
 import { TEXTO_HORAS } from "./types";
 
 /**
@@ -115,6 +116,10 @@ export function usePainelHoras(configuracao: ConfiguracaoDashboard | null) {
         diaSelecionado,
         diaReferencia,
         ehDiaReferenciaHoje: diaSelecionado === null,
+        // No modo demo a navegação de semana fica travada: as fixtures estáticas só cobrem a
+        // semana "atual" (sempre recalculada na hora, ver ResolverDatasDemoHoras) — não existe
+        // fixture nenhuma para semana anterior/seguinte.
+        podeNavegarSemana: !EH_MODO_DEMO,
         handleSemanaAnterior,
         handleSemanaSeguinte,
         handleSelecionarDia,

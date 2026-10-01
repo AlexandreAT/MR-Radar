@@ -1,0 +1,21 @@
+# Build da demonstração pública (dados 100% fictícios, ClienteDemo — ver backend/src/integracao/demo/).
+# Não usa nenhum segredo: não defina nenhuma variável de ambiente neste site do Netlify além do
+# NODE_VERSION abaixo. "npm run build:demo" já liga o modo demo sozinho (via cross-env); o
+# caminho base fica na raiz por padrão, que é exatamente onde cada site do Netlify vive.
+
+[build]
+  command = "npm run setup && npm run fixtures:demo --prefix backend && npm run build:demo --prefix frontend"
+  publish = "frontend/dist"
+
+[build.environment]
+  NODE_VERSION = "16.15.1"
+
+# Cabeçalhos de segurança. O principal é o connect-src 'self': o navegador recusa qualquer conexão
+# fora do próprio site, então a demonstração não tem como falar com GitLab, GitHub ou qualquer
+# outro servidor, nem por engano. O 'unsafe-inline' de estilo é exigido pelo styled-components.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "no-referrer"

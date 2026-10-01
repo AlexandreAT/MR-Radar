@@ -3,7 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { CodigoErroProvedor, ErroProvedor } from "../integracao/ErroProvedor";
 import { StatusHttp } from "../utilidades/types";
-import { CONFIGURACAO_PADRAO, ConfiguracaoApp, LIMITE, Provedor, TOKEN_EXEMPLO, VariavelEnv } from "./types";
+import { CONFIGURACAO_PADRAO, ConfiguracaoApp, DOMINIO_EXEMPLO, LIMITE, Provedor, TOKEN_EXEMPLO, VariavelEnv } from "./types";
 
 const RAIZ_BACKEND: string = path.resolve(__dirname, "..", "..");
 const RAIZ_PROJETO: string = path.resolve(RAIZ_BACKEND, "..");
@@ -18,12 +18,18 @@ const CAMINHO_API_GITHUB_ENTERPRISE = "/api/v3";
 const NOME_DO_PROVEDOR: Record<Provedor, string> = {
     [Provedor.GitLab]: "GitLab",
     [Provedor.GitHub]: "GitHub",
+    [Provedor.Demo]: "Demo",
 };
 
-/** Variável que guarda o token de cada provedor. */
+/**
+ * Variável que guarda o token de cada provedor. A entrada de Demo nunca é lida de verdade —
+ * `ValidarConfiguracao` sai antes de chegar nela, porque o modo demo não exige token nenhum — ela
+ * só existe para satisfazer o tipo `Record<Provedor, VariavelEnv>`.
+ */
 const VARIAVEL_DO_TOKEN: Record<Provedor, VariavelEnv> = {
     [Provedor.GitLab]: VariavelEnv.TokenGitLab,
     [Provedor.GitHub]: VariavelEnv.TokenGitHub,
+    [Provedor.Demo]: VariavelEnv.Provedor,
 };
 
 /**
@@ -81,9 +87,13 @@ function lerProvedor(): Provedor {
 /**
  * Monta a URL base da API do provedor ativo, a partir do que está no .env.
  * @param provedor Provedor ativo.
- * @returns URL base já pronta para receber os caminhos da API, sem barra no final.
+ * @returns URL base já pronta para receber os caminhos da API, sem barra no final. Vazia no modo
+ * demo, que não fala com nenhuma API real — o cabeçalho então não mostra endereço nenhum.
  */
 function getUrlBase(provedor: Provedor): string {
+    if (provedor === Provedor.Demo)
+        return "";
+
     if (provedor === Provedor.GitLab)
         return lerTexto(VariavelEnv.UrlGitLab).replace(BARRAS_FINAIS, "").replace(SUFIXO_API_GITLAB, "");
 
@@ -110,17 +120,21 @@ function lerLista(variavel: VariavelEnv): string[] {
 }
 
 /**
- * Monta a configuração da aplicação a partir do arquivo .env.
+ * Monta a configuração da aplicação a partir do arquivo .env. Só é chamada por quem sobe o
+ * servidor de verdade: importar este módulo não lê .env nenhum — é o que garante que o script de
+ * geração de fixtures da demo nunca tenha token nem URL real em memória.
  * @returns Configuração completa, com os valores padrão já aplicados.
  */
-function GetConfiguracao(): ConfiguracaoApp {
+export function GetConfiguracao(): ConfiguracaoApp {
     const arquivosEnvCarregados: string[] = carregarArquivosEnv();
     const provedor: Provedor = lerProvedor();
 
     return {
         provedor,
         urlBase: getUrlBase(provedor),
-        token: lerTexto(VARIAVEL_DO_TOKEN[provedor]),
+        // O modo demo não usa token nenhum — fica vazio de propósito, em vez de ler alguma
+        // variável de verdade (a entrada de Demo em VARIAVEL_DO_TOKEN nunca é lida por aqui).
+        token: provedor === Provedor.Demo ? "" : lerTexto(VARIAVEL_DO_TOKEN[provedor]),
         porta: lerInteiro(VariavelEnv.Porta, CONFIGURACAO_PADRAO.PORTA, LIMITE.PORTA_MIN, LIMITE.PORTA_MAX),
         host: lerTexto(VariavelEnv.Host, CONFIGURACAO_PADRAO.HOST),
         linhasContexto: lerInteiro(VariavelEnv.LinhasContexto, CONFIGURACAO_PADRAO.LINHAS_CONTEXTO, 0, LIMITE.LINHAS_CONTEXTO_MAX),
@@ -140,6 +154,10 @@ function GetConfiguracao(): ConfiguracaoApp {
  * @returns Lista de problemas encontrados. Vazia quando está tudo certo.
  */
 export function ValidarConfiguracao(configuracao: ConfiguracaoApp): string[] {
+    // O modo demo não fala com nenhum provedor real: não exige token nem URL nenhuma.
+    if (configuracao.provedor === Provedor.Demo)
+        return [];
+
     const problemas: string[] = [];
     const variavelDoToken: VariavelEnv = VARIAVEL_DO_TOKEN[configuracao.provedor];
 
@@ -148,6 +166,8 @@ export function ValidarConfiguracao(configuracao: ConfiguracaoApp): string[] {
         problemas.push(`A variável ${VariavelEnv.UrlGitLab} não foi definida no arquivo .env.`);
     else if (!ehUrlValida(configuracao.urlBase))
         problemas.push(`A URL do ${NOME_DO_PROVEDOR[configuracao.provedor]} precisa ser uma URL http ou https válida.`);
+    else if (ehUrlDeExemplo(configuracao.urlBase))
+        problemas.push(`A URL do ${NOME_DO_PROVEDOR[configuracao.provedor]} ainda está com o valor de exemplo. Informe o endereço da sua instância.`);
 
     if (!configuracao.token)
         problemas.push(`A variável ${variavelDoToken} não foi definida no arquivo .env.`);
@@ -188,4 +208,13 @@ function ehUrlValida(valor: string): boolean {
     }
 }
 
-export const configuracao: ConfiguracaoApp = GetConfiguracao();
+/**
+ * Indica se a URL ainda aponta para o domínio de exemplo do .env.example.
+ * @param valor URL já validada por `ehUrlValida`.
+ * @returns Verdadeiro quando o endereço é o de exemplo, e não uma instância real.
+ */
+function ehUrlDeExemplo(valor: string): boolean {
+    const host: string = new URL(valor).hostname.toLowerCase();
+
+    return host === DOMINIO_EXEMPLO || host.endsWith(`.${DOMINIO_EXEMPLO}`);
+}

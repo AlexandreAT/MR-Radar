@@ -34,6 +34,17 @@ const VOCABULARIO_POR_PROVEDOR: Record<Provedor, Vocabulario> = {
         placeholderNumero: "456",
         prefixoReferencia: "#",
     },
+    // O modo demo copia o vocabulário do GitLab: é o único dos dois que também tem a página de Horas.
+    [Provedor.Demo]: {
+        nomeProvedor: "GitLab",
+        nomeItem: "Merge Request",
+        nomeItemPlural: "Merge Requests",
+        rotuloProjeto: "Project ID ou caminho",
+        placeholderProjeto: "123 ou grupo/projeto",
+        rotuloNumero: "IID do Merge Request",
+        placeholderNumero: "456",
+        prefixoReferencia: "!",
+    },
 };
 
 /**

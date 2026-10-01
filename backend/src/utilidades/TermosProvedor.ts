@@ -22,6 +22,13 @@ const TERMOS_POR_PROVEDOR: Record<Provedor, TermosProvedor> = {
         rotuloNumero: "Number do Pull Request",
         nomeItem: "Pull Request",
     },
+    // O modo demo copia o vocabulário do GitLab: é o único dos dois que também tem a página de Horas.
+    [Provedor.Demo]: {
+        rotuloProjeto: "Project ID",
+        dicaProjeto: "Use o ID numérico do projeto ou o caminho completo, como grupo/subgrupo/projeto.",
+        rotuloNumero: "IID do Merge Request",
+        nomeItem: "Merge Request",
+    },
 };
 
 /**

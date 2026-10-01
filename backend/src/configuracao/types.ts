@@ -54,6 +54,12 @@ export const LIMITE = {
 export const TOKEN_EXEMPLO = "cole_seu_token_aqui";
 
 /**
+ * Domínio reservado para exemplos (RFC 2606), usado nas URLs do .env.example. Nunca é uma
+ * instância real: o backend se recusa a mandar o token para ele.
+ */
+export const DOMINIO_EXEMPLO = "example.com";
+
+/**
  * Configuração da aplicação, montada a partir do arquivo .env.
  * urlBase e token já são os do provedor ativo: o resto do backend não precisa saber de qual
  * variável do .env eles vieram.
